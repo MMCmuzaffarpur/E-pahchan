@@ -1,0 +1,6 @@
+{
+  "name": "Employee e-ID Card & PDF Transcript Portal",
+  "description": "Smart Employee ID Portal with PDF transcript extractor, ID card generator (Front & Back), A4 print preview, and Admin/User role management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
