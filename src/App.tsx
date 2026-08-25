@@ -2,18 +2,20 @@ import React, { useState, useEffect } from 'react';
 import {
   getCurrentUser,
   setCurrentUser,
-  getEmployees,
-  saveEmployees,
-  addEmployee,
-  updateEmployee,
-  deleteEmployee,
-  getPortalUsers,
-  toggleUserStatus,
-  deletePortalUser,
-  addPortalUser,
-  getGlobalSettings,
-  saveGlobalSettings,
 } from './utils/storage';
+import {
+  fetchEmployeesApi,
+  saveEmployeeApi,
+  deleteEmployeeApi,
+  fetchUsersApi,
+  createUserApi,
+  toggleUserStatusApi,
+  deleteUserApi,
+  fetchSettingsApi,
+  saveSettingsApi,
+  checkServerDbStatus,
+  DbStatusInfo,
+} from './utils/api';
 import { PortalUser, EmployeeRecord, GlobalSettings } from './types';
 import { LoginPage } from './components/LoginPage';
 import { Navbar } from './components/Navbar';
@@ -33,7 +35,14 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [users, setUsers] = useState<PortalUser[]>([]);
-  const [settings, setSettings] = useState<GlobalSettings>(getGlobalSettings());
+  const [settings, setSettings] = useState<GlobalSettings>({
+    employerSignature: '',
+    employerStamp: '',
+    organizationName: "EMPLOYEES' STATE INSURANCE CORPORATION",
+    portalTitle: 'e-Pehchan Smart ID Portal & PDF Registry',
+    helplineNo: '1800-11-2526 / 0612-2500123',
+  });
+  const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
 
   // Modals state
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -44,13 +53,29 @@ export default function App() {
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Load initial state on mount
+  // Load initial state on mount from Backend API & Fallbacks
   useEffect(() => {
     const user = getCurrentUser();
     setCurrentUserState(user);
-    setEmployees(getEmployees());
-    setUsers(getPortalUsers());
-    setSettings(getGlobalSettings());
+
+    async function loadInitialData() {
+      try {
+        const [empData, usrData, settsData, statusData] = await Promise.all([
+          fetchEmployeesApi(),
+          fetchUsersApi(),
+          fetchSettingsApi(),
+          checkServerDbStatus(),
+        ]);
+        setEmployees(empData);
+        setUsers(usrData);
+        setSettings(settsData);
+        setDbStatus(statusData);
+      } catch (err) {
+        console.warn('Error fetching initial backend data:', err);
+      }
+    }
+
+    loadInitialData();
   }, []);
 
   const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
@@ -83,62 +108,96 @@ export default function App() {
     addToast('info', 'Logged out successfully');
   };
 
-  // Employee Handlers
-  const handleSaveEmployeeFromPdf = (
+  // Employee Handlers (Connecting directly to Backend API & SQL)
+  const handleSaveEmployeeFromPdf = async (
     employeeData: Omit<EmployeeRecord, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
-    const newEmp = addEmployee(employeeData);
-    setEmployees(getEmployees());
-    addToast(
-      'success',
-      'PDF Transcript Saved to Database!',
-      `Employee ${newEmp.name} (IP: ${newEmp.insuranceNo}) is ready for ID card viewing & printing.`
-    );
-    // Optionally open the newly created ID card
-    setSelectedCardEmp(newEmp);
+    try {
+      const newEmp = await saveEmployeeApi(employeeData);
+      const updatedList = await fetchEmployeesApi();
+      setEmployees(updatedList);
+      addToast(
+        'success',
+        'PDF Transcript Saved to Database!',
+        `Employee ${newEmp.name} (IP: ${newEmp.insuranceNo}) saved and synchronized with database.`
+      );
+      setSelectedCardEmp(newEmp);
+    } catch (err) {
+      addToast('error', 'Failed to save employee', 'Please check connection.');
+    }
   };
 
-  const handleUpdateEmployee = (id: string, updates: Partial<EmployeeRecord>) => {
-    const updated = updateEmployee(id, updates);
-    setEmployees(updated);
-    addToast('success', 'Employee Record Updated', 'Photos and details saved successfully.');
+  const handleUpdateEmployee = async (id: string, updates: Partial<EmployeeRecord>) => {
+    try {
+      await saveEmployeeApi({ ...updates, id });
+      const updatedList = await fetchEmployeesApi();
+      setEmployees(updatedList);
+      addToast('success', 'Employee Record Updated', 'Photos, signatures and details synchronized.');
+    } catch (err) {
+      addToast('error', 'Update Failed', 'Could not update employee record.');
+    }
   };
 
-  const handleDeleteEmployee = (id: string, name: string) => {
-    const updated = deleteEmployee(id);
-    setEmployees(updated);
-    addToast('info', 'Employee Record Deleted', `Removed ${name} from database.`);
+  const handleDeleteEmployee = async (id: string, name: string) => {
+    try {
+      await deleteEmployeeApi(id);
+      const updatedList = await fetchEmployeesApi();
+      setEmployees(updatedList);
+      addToast('info', 'Employee Record Deleted', `Removed ${name} from database.`);
+    } catch (err) {
+      addToast('error', 'Delete Failed', 'Could not delete employee record.');
+    }
   };
 
   // User Management Handlers
-  const handleToggleUserStatus = (userId: string) => {
-    const updated = toggleUserStatus(userId);
-    setUsers(updated);
-    const targetUser = updated.find((u) => u.id === userId);
-    addToast(
-      'info',
-      'User Status Updated',
-      `${targetUser?.name} is now ${targetUser?.isActive ? 'Active' : 'Deactivated'}`
-    );
+  const handleToggleUserStatus = async (userId: string) => {
+    try {
+      const updatedUser = await toggleUserStatusApi(userId);
+      const updatedList = await fetchUsersApi();
+      setUsers(updatedList);
+      if (updatedUser) {
+        addToast(
+          'info',
+          'User Status Updated',
+          `${updatedUser.name} is now ${updatedUser.isActive ? 'Active' : 'Deactivated'}`
+        );
+      }
+    } catch (err) {
+      addToast('error', 'Status Update Failed');
+    }
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
-    const updated = deletePortalUser(userId);
-    setUsers(updated);
-    addToast('info', 'User Deleted', `Removed ${userName} from portal users.`);
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    try {
+      await deleteUserApi(userId);
+      const updatedList = await fetchUsersApi();
+      setUsers(updatedList);
+      addToast('info', 'User Deleted', `Removed ${userName} from portal users.`);
+    } catch (err) {
+      addToast('error', 'Delete User Failed');
+    }
   };
 
-  const handleAddUser = (newUserData: Omit<PortalUser, 'id' | 'createdAt'>) => {
-    const updated = addPortalUser(newUserData);
-    setUsers(updated);
-    addToast('success', 'New User Created', `${newUserData.name} (${newUserData.role}) registered.`);
+  const handleAddUser = async (newUserData: Omit<PortalUser, 'id' | 'createdAt'>) => {
+    try {
+      const created = await createUserApi(newUserData);
+      const updatedList = await fetchUsersApi();
+      setUsers(updatedList);
+      addToast('success', 'New User Created', `${created.name} (${created.role}) registered in database.`);
+    } catch (err) {
+      addToast('error', 'Create User Failed');
+    }
   };
 
   // Settings Handlers
-  const handleSaveSettings = (newSettings: GlobalSettings) => {
-    setSettings(newSettings);
-    saveGlobalSettings(newSettings);
-    addToast('success', 'Global Settings Saved', 'Employer signature (Sign.jpg) updated.');
+  const handleSaveSettings = async (newSettings: GlobalSettings) => {
+    try {
+      const saved = await saveSettingsApi(newSettings);
+      setSettings(saved);
+      addToast('success', 'Global Settings Saved', 'Employer signature (Sign.jpg) and configuration saved to database.');
+    } catch (err) {
+      addToast('error', 'Settings Save Failed');
+    }
   };
 
   // If not logged in, show Login Page
