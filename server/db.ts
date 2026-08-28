@@ -96,11 +96,14 @@ export async function initDatabase(): Promise<{ success: boolean; type: 'postgre
           id VARCHAR(255) PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           email VARCHAR(255) UNIQUE NOT NULL,
+          password VARCHAR(255) DEFAULT 'User123',
           role VARCHAR(50) DEFAULT 'User',
           is_active BOOLEAN DEFAULT TRUE,
           department VARCHAR(255),
           avatar_url TEXT,
           last_login VARCHAR(100),
+          authorized_employee_ids TEXT,
+          authorize_all BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
       `);
@@ -300,16 +303,23 @@ export async function getAllUsersFromDb() {
           id,
           name,
           email,
+          password,
           role,
           is_active AS "isActive",
           department,
           avatar_url AS "avatarUrl",
           last_login AS "lastLogin",
+          authorized_employee_ids AS "authorizedEmployeeIdsStr",
+          authorize_all AS "authorizeAll",
           created_at AS "createdAt"
         FROM portal_users
         ORDER BY created_at ASC
       `);
-      return res.rows;
+      return res.rows.map((row: any) => ({
+        ...row,
+        authorizedEmployeeIds: row.authorizedEmployeeIdsStr ? JSON.parse(row.authorizedEmployeeIdsStr) : [],
+        authorizeAll: row.authorizeAll !== false,
+      }));
     } catch (e) {
       console.error('Error fetching users from PostgreSQL:', e);
     }
@@ -319,35 +329,48 @@ export async function getAllUsersFromDb() {
 
 export async function saveUserToDb(user: any) {
   const dbPool = getDbPool();
+  const authIdsStr = JSON.stringify(user.authorizedEmployeeIds || []);
+  const authAll = user.authorizeAll !== undefined ? user.authorizeAll : (user.role === 'Admin');
+
   if (dbPool && isConnectedToSql) {
     try {
       const query = `
         INSERT INTO portal_users (
-          id, name, email, role, is_active, department, avatar_url, last_login, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          id, name, email, password, role, is_active, department, avatar_url, last_login, authorized_employee_ids, authorize_all, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           email = EXCLUDED.email,
+          password = EXCLUDED.password,
           role = EXCLUDED.role,
           is_active = EXCLUDED.is_active,
           department = EXCLUDED.department,
           avatar_url = EXCLUDED.avatar_url,
-          last_login = EXCLUDED.last_login
+          last_login = EXCLUDED.last_login,
+          authorized_employee_ids = EXCLUDED.authorized_employee_ids,
+          authorize_all = EXCLUDED.authorize_all
         RETURNING *;
       `;
       const values = [
         user.id,
         user.name,
         user.email,
+        user.password || (user.role === 'Admin' ? 'Admin123' : 'User123'),
         user.role || 'User',
         user.isActive !== false,
         user.department || '',
         user.avatarUrl || '',
         user.lastLogin || '',
+        authIdsStr,
+        authAll,
         user.createdAt || new Date().toISOString(),
       ];
       const res = await dbPool.query(query, values);
-      return res.rows[0];
+      return {
+        ...res.rows[0],
+        authorizedEmployeeIds: user.authorizedEmployeeIds || [],
+        authorizeAll: authAll,
+      };
     } catch (e) {
       console.error('Error saving user to PostgreSQL:', e);
     }
@@ -355,11 +378,12 @@ export async function saveUserToDb(user: any) {
 
   const idx = fallbackUsers.findIndex((u) => u.id === user.id);
   if (idx >= 0) {
-    fallbackUsers[idx] = { ...fallbackUsers[idx], ...user };
+    fallbackUsers[idx] = { ...fallbackUsers[idx], ...user, authorizedEmployeeIds: user.authorizedEmployeeIds || [], authorizeAll: authAll };
     return fallbackUsers[idx];
   } else {
-    fallbackUsers.push(user);
-    return user;
+    const newUser = { ...user, authorizedEmployeeIds: user.authorizedEmployeeIds || [], authorizeAll: authAll };
+    fallbackUsers.push(newUser);
+    return newUser;
   }
 }
 

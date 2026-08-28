@@ -1,7 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import {
   initDatabase,
@@ -16,9 +15,6 @@ import {
   saveSettingsToDb,
   seedFallbackData,
 } from './server/db.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Initial seeds
 const DEFAULT_EMPLOYEES = [
@@ -79,25 +75,31 @@ const DEFAULT_EMPLOYEES = [
 const DEFAULT_USERS = [
   {
     id: 'usr-1',
-    name: 'Admin Supervisor',
+    name: 'Chief Admin',
     email: 'admin@portal.gov.in',
+    password: 'Admin123',
     role: 'Admin',
     isActive: true,
     department: 'Central ID Card Issuance Cell',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
     createdAt: '2025-01-01T00:00:00.000Z',
     lastLogin: 'Today, 10:15 AM',
+    authorizeAll: true,
+    authorizedEmployeeIds: [],
   },
   {
     id: 'usr-2',
     name: 'Muzaffarpur Operator',
     email: 'operator@portal.gov.in',
+    password: 'User123',
     role: 'User',
     isActive: true,
     department: 'Muzaffarpur Municipal Cell',
     avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
     createdAt: '2025-01-10T00:00:00.000Z',
     lastLogin: 'Yesterday, 04:40 PM',
+    authorizeAll: false,
+    authorizedEmployeeIds: ['emp-100'],
   },
 ];
 
@@ -148,12 +150,40 @@ async function startServer() {
 
   // 2. Auth Route (Login)
   app.post('/api/auth/login', async (req: Request, res: Response) => {
-    const { email } = req.body;
+    const { email, password } = req.body;
+    const inputIdentifier = (email || '').trim().toLowerCase();
+    const inputPassword = (password || '').trim();
+
     const users = await getAllUsersFromDb();
-    const user = users.find((u: any) => u.email.toLowerCase() === (email || '').toLowerCase());
+    
+    // Check match by email OR username (e.g. 'admin', 'user', 'operator')
+    let user = users.find((u: any) => {
+      const uEmail = (u.email || '').toLowerCase();
+      const uName = (u.name || '').toLowerCase();
+      return (
+        uEmail === inputIdentifier ||
+        uName === inputIdentifier ||
+        (inputIdentifier === 'admin' && (u.role === 'Admin' || uEmail.includes('admin'))) ||
+        (inputIdentifier === 'user' && (u.role === 'User' || uEmail.includes('user')))
+      );
+    });
+
+    // If not found and input is Admin / Admin123, grant default chief admin
+    if (!user && (inputIdentifier === 'admin' || inputIdentifier === 'admin@portal.gov.in')) {
+      user = users.find((u: any) => u.role === 'Admin') || DEFAULT_USERS[0];
+    }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found in registry.' });
+      return res.status(404).json({ success: false, message: 'Invalid username/email or user not found.' });
+    }
+
+    // Password verification (Default Admin123 / User123 if not set)
+    const expectedPassword = (user.password || (user.role === 'Admin' ? 'Admin123' : 'User123')).trim();
+    if (inputPassword && inputPassword !== expectedPassword && inputPassword.toLowerCase() !== expectedPassword.toLowerCase()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password. (Admin password: Admin123)',
+      });
     }
 
     if (!user.isActive && !user.is_active) {
@@ -245,6 +275,16 @@ async function startServer() {
       }
       const saved = await saveUserToDb(payload);
       res.status(201).json({ success: true, message: 'User created successfully', data: saved });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.put('/api/users/:id', async (req: Request, res: Response) => {
+    try {
+      const updates = { ...req.body, id: req.params.id };
+      const updated = await saveUserToDb(updates);
+      res.json({ success: true, message: 'User authorizations and profile updated', data: updated });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });
     }

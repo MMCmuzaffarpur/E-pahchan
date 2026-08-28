@@ -1,246 +1,298 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Lock, Mail, ArrowRight, Eye, EyeOff, UserCheck, Sparkles, Building2, FileText, CheckCircle2 } from 'lucide-react';
+import {
+  ShieldCheck,
+  Lock,
+  User,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  UserCheck,
+  Sparkles,
+  Building2,
+  FileText,
+  CheckCircle2,
+  KeyRound,
+  AlertCircle,
+  Phone,
+  Globe,
+  Award,
+} from 'lucide-react';
 import { PortalUser } from '../types';
-import { getPortalUsers } from '../utils/storage';
+import { loginApi } from '../utils/api';
+import { NATIONAL_EMBLEM_SVG, ESIC_OFFICIAL_LOGO } from '../utils/defaultAssets';
 
 interface LoginPageProps {
   onLoginSuccess: (user: PortalUser) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('admin@portal.gov.in');
-  const [password, setPassword] = useState('admin123');
+  const [identifier, setIdentifier] = useState('Admin');
+  const [password, setPassword] = useState('Admin123');
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRolePreset, setSelectedRolePreset] = useState<'Admin' | 'User'>('Admin');
+  const [selectedPreset, setSelectedPreset] = useState<'Admin' | 'User'>('Admin');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handlePresetSelect = (role: 'Admin' | 'User') => {
-    setSelectedRolePreset(role);
-    if (role === 'Admin') {
-      setEmail('admin@portal.gov.in');
-      setPassword('admin123');
-    } else {
-      setEmail('user@portal.gov.in');
-      setPassword('user123');
-    }
+  const handlePresetSelect = (preset: 'Admin' | 'User') => {
+    setSelectedPreset(preset);
     setErrorMsg(null);
+    if (preset === 'Admin') {
+      setIdentifier('Admin');
+      setPassword('Admin123');
+    } else {
+      setIdentifier('user@portal.gov.in');
+      setPassword('User123');
+    }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg(null);
 
-    setTimeout(() => {
-      const users = getPortalUsers();
-      const matchedUser = users.find(
-        (u) => u.email.trim().toLowerCase() === email.trim().toLowerCase()
-      );
-
-      if (!matchedUser) {
-        // Allow demo login if user created it or default fallback
-        if (email === 'admin@portal.gov.in' || email === 'user@portal.gov.in') {
-          const fallbackUser: PortalUser = {
-            id: 'user-' + (selectedRolePreset === 'Admin' ? 'admin-1' : 'staff-2'),
-            name: selectedRolePreset === 'Admin' ? 'Chief Portal Admin' : 'Operator Staff',
-            email: email,
-            role: selectedRolePreset,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            lastLogin: 'Just now',
-          };
-          setIsLoading(false);
-          onLoginSuccess(fallbackUser);
-          return;
-        }
-        setIsLoading(false);
-        setErrorMsg('Invalid email or password. Please check your credentials.');
-        return;
+    try {
+      const res = await loginApi(identifier, password);
+      if (res.success && res.user) {
+        onLoginSuccess(res.user);
+      } else {
+        setErrorMsg(res.message || 'Invalid username/email or password.');
       }
-
-      if (!matchedUser.isActive) {
-        setIsLoading(false);
-        setErrorMsg('Your account has been deactivated by the Administrator. Please contact support.');
-        return;
-      }
-
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Authentication error. Please try again.');
+    } finally {
       setIsLoading(false);
-      onLoginSuccess(matchedUser);
-    }, 600);
+    }
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex flex-col justify-center items-center relative overflow-hidden p-4">
-      {/* Background ambient lighting effects */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+    <div className="min-h-screen w-full bg-[#071426] flex flex-col justify-between items-center relative overflow-hidden font-sans text-slate-100">
+      {/* Top Sovereign Tricolor Ribbon */}
+      <div className="w-full h-2 flex z-30 shadow-md">
+        <div className="w-1/3 h-full bg-[#ff9933]" />
+        <div className="w-1/3 h-full bg-[#ffffff]" />
+        <div className="w-1/3 h-full bg-[#138808]" />
+      </div>
 
-      {/* Main card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl p-8 backdrop-blur-xl relative z-10"
-      >
-        {/* Header with Emblem */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-lg shadow-blue-500/20 mb-4 border border-blue-400/30">
-            <Building2 className="w-7 h-7 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            e-Pehchan Smart ID Portal
-          </h1>
-          <p className="text-xs text-slate-400 mt-1.5 uppercase tracking-wider font-medium">
-            PDF Transcript & Employee ID Card Generation System
-          </p>
-          <div className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-0.5 rounded-full bg-blue-950/60 border border-blue-800/60 text-[11px] font-medium text-blue-300">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            2 Role Access: Admin & Operator
-          </div>
-        </div>
+      {/* Background ambient lighting */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#1e3a8a25_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
-        {/* Quick Role Switcher Buttons */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Select Role / तुरंत लॉगिन रोल चुनें:
-          </label>
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950/80 border border-slate-800 rounded-xl">
-            <button
-              type="button"
-              onClick={() => handlePresetSelect('Admin')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                selectedRolePreset === 'Admin'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Admin (Full Control)
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePresetSelect('User')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                selectedRolePreset === 'User'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              User (Operator)
-            </button>
-          </div>
-        </div>
-
-        {/* Error message */}
-        {errorMsg && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mb-4 p-3 bg-rose-950/70 border border-rose-800/80 rounded-xl text-xs text-rose-200"
-          >
-            {errorMsg}
-          </motion.div>
-        )}
-
-        {/* Login Form */}
-        <form onSubmit={handleLoginSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@portal.gov.in"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              />
+      {/* Top Official Government Banner */}
+      <header className="w-full max-w-5xl mx-auto px-4 py-4 z-20">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={NATIONAL_EMBLEM_SVG}
+              alt="National Emblem"
+              className="w-9 h-11 object-contain drop-shadow"
+            />
+            <div>
+              <p className="text-[11px] font-black text-amber-400 tracking-wider">
+                भारत सरकार / Government of India
+              </p>
+              <p className="text-[9px] text-slate-300 font-semibold">
+                श्रम एवं रोजगार मंत्रालय / Ministry of Labour & Employment
+              </p>
+              <p className="text-[8px] text-slate-400">
+                कर्मचारी राज्य बीमा निगम / Employees' State Insurance Corporation
+              </p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              />
+          <div className="flex items-center gap-2.5 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
+            <img
+              src={ESIC_OFFICIAL_LOGO}
+              alt="ESIC"
+              className="w-8 h-8 rounded-full bg-white p-0.5"
+            />
+            <div className="text-right">
+              <span className="text-xs font-black text-white block leading-tight">
+                e-Pehchan Portal
+              </span>
+              <span className="text-[9px] text-amber-300 font-bold block">
+                ई-पहचान स्मार्ट आईडी सिस्टम
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Login Center Card */}
+      <main className="w-full max-w-md px-4 py-4 z-20 flex-1 flex flex-col justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full bg-[#0c2038]/95 border-2 border-amber-500/40 rounded-3xl shadow-2xl p-6 sm:p-7 backdrop-blur-xl relative"
+        >
+          {/* Card Top Pill */}
+          <div className="text-center mb-5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 text-[11px] font-bold text-amber-300 mb-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Official Government Portal Authentication</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              पोर्टल लॉगिन / Portal Sign In
+            </h1>
+            <p className="text-xs text-slate-300 mt-1">
+              PDF Transcript, IP Extraction & Employee Smart ID System
+            </p>
+          </div>
+
+          {/* Quick Credential Switcher (Admin / User) */}
+          <div className="mb-4 bg-[#07172b] border border-slate-700/80 rounded-2xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                <span>Quick 1-Click Roles / तुरंत लॉगिन चुनें:</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Admin Preset */}
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                onClick={() => handlePresetSelect('Admin')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedPreset === 'Admin'
+                    ? 'bg-amber-950/60 border-amber-400 text-white shadow-lg ring-1 ring-amber-400'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Admin / एडमिन</span>
+                </div>
+                <p className="text-[10px] text-slate-200 mt-1 font-mono">User: <b>Admin</b></p>
+                <p className="text-[10px] text-slate-300 font-mono">Pass: <b>Admin123</b></p>
+                <span className="text-[8.5px] text-emerald-400 font-bold block mt-0.5">
+                  ★ Full Portal & User Auth
+                </span>
+              </button>
+
+              {/* User / Operator Preset */}
+              <button
+                type="button"
+                onClick={() => handlePresetSelect('User')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedPreset === 'User'
+                    ? 'bg-blue-950/70 border-blue-400 text-white shadow-lg ring-1 ring-blue-400'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Operator / यूजर</span>
+                </div>
+                <p className="text-[10px] text-slate-200 mt-1 font-mono truncate">User: <b>user@portal</b></p>
+                <p className="text-[10px] text-slate-300 font-mono">Pass: <b>User123</b></p>
+                <span className="text-[8.5px] text-blue-300 font-bold block mt-0.5">
+                  🔒 Authorized Cards Only
+                </span>
               </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer hover:text-slate-300">
-              <input
-                type="checkbox"
-                defaultChecked
-                className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0"
-              />
-              Remember session
-            </label>
-            <span className="text-slate-500">Auto-saved to browser</span>
-          </div>
+          {/* Error Alert */}
+          {errorMsg && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mb-4 p-3 bg-rose-950/80 border border-rose-800 rounded-xl text-xs text-rose-200 flex items-start gap-2"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Authentication Failed</p>
+                <p className="text-[11px] text-rose-300 mt-0.5">{errorMsg}</p>
+              </div>
+            </motion.div>
+          )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-70 cursor-pointer"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Authenticating...
-              </span>
-            ) : (
-              <>
-                <span>Enter Portal / पोर्टल में प्रवेश करें</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
+          {/* Form */}
+          <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Username / Email ID (उपयोगकर्ता नाम / ईमेल)
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  required
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="e.g. Admin or user@portal.gov.in"
+                  className="w-full bg-[#07172b] border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                />
+              </div>
+            </div>
 
-        {/* Feature highlight badges */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-center text-[10px] text-slate-400">
-          <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/50 flex flex-col items-center gap-1">
-            <FileText className="w-3.5 h-3.5 text-blue-400" />
-            <span>PDF Transcript</span>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Password (पासवर्ड)
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-[#07172b] border border-slate-700 rounded-xl py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-sm shadow-xl shadow-amber-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-70 cursor-pointer uppercase tracking-wider"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                  Authenticating...
+                </span>
+              ) : (
+                <>
+                  <span>Sign In &bull; पोर्टल लॉगिन करें</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Micro Security Notice */}
+          <div className="mt-4 pt-3 border-t border-slate-800 text-center text-[10.5px] text-slate-400 flex items-center justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Secure 256-Bit SSL Encrypted Government Portal Session</span>
           </div>
-          <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/50 flex flex-col items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Smart ID Card</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/50 flex flex-col items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>A4 Print Ready</span>
-          </div>
+        </motion.div>
+      </main>
+
+      {/* Official Government Footer */}
+      <footer className="w-full max-w-5xl mx-auto px-4 py-3 z-20 text-center border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+        <div className="flex items-center gap-2">
+          <span>Toll-Free Helpline:</span>
+          <strong className="text-amber-300 font-mono">1800 11 2526</strong>
+          <span>(ESIC Helpdesk)</span>
         </div>
-      </motion.div>
 
-      {/* Footer copyright */}
-      <p className="mt-6 text-xs text-slate-500 text-center">
-        e-Pehchan & ESIC ID Card Automation Engine &bull; Secure Administrative Access
-      </p>
+        <div>
+          <span>Designed & Maintained for Government e-Pehchan &bull; </span>
+          <span className="text-slate-300 font-semibold">Muzaffarpur Municipal Corporation</span>
+        </div>
+      </footer>
     </div>
   );
 };

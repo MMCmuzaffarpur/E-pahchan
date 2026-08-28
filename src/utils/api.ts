@@ -114,6 +114,57 @@ export async function deleteEmployeeApi(id: string): Promise<boolean> {
 }
 
 // ----------------------------------------------------
+// Auth API
+// ----------------------------------------------------
+export async function loginApi(identifier: string, password?: string): Promise<{ success: boolean; user?: PortalUser; message: string }> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: identifier, password }),
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      return { success: true, user: result.user, message: result.message };
+    } else {
+      return { success: false, message: result.message || 'Login failed' };
+    }
+  } catch (e: any) {
+    console.warn('API /api/auth/login failed, checking local storage:', e);
+  }
+
+  // Local fallback check
+  const localUsers = getLocalUsers();
+  const lower = identifier.trim().toLowerCase();
+  let user = localUsers.find(
+    (u) =>
+      u.email.trim().toLowerCase() === lower ||
+      u.name.trim().toLowerCase() === lower ||
+      (lower === 'admin' && u.role === 'Admin') ||
+      (lower === 'user' && u.role === 'User')
+  );
+
+  if (!user && (lower === 'admin' || lower === 'admin@portal.gov.in')) {
+    user = localUsers.find((u) => u.role === 'Admin') || localUsers[0];
+  }
+
+  if (!user) {
+    return { success: false, message: 'Invalid username/email. Check credentials.' };
+  }
+
+  const expectedPass = (user.password || (user.role === 'Admin' ? 'Admin123' : 'User123')).trim();
+  if (password && password.trim() !== expectedPass && password.trim().toLowerCase() !== expectedPass.toLowerCase()) {
+    return { success: false, message: `Incorrect password. (Admin password: Admin123)` };
+  }
+
+  if (!user.isActive) {
+    return { success: false, message: 'Account has been deactivated by administrator.' };
+  }
+
+  return { success: true, user, message: `Welcome back, ${user.name}!` };
+}
+
+// ----------------------------------------------------
 // User API
 // ----------------------------------------------------
 export async function fetchUsersApi(): Promise<PortalUser[]> {
@@ -151,11 +202,40 @@ export async function createUserApi(userData: Omit<PortalUser, 'id' | 'createdAt
   const newUser: PortalUser = {
     ...userData,
     id: 'usr-' + Date.now(),
+    password: userData.password || (userData.role === 'Admin' ? 'Admin123' : 'User123'),
+    authorizeAll: userData.authorizeAll ?? (userData.role === 'Admin'),
+    authorizedEmployeeIds: userData.authorizedEmployeeIds || [],
     createdAt: new Date().toISOString(),
+    lastLogin: 'Never',
   };
   localUsers.push(newUser);
   saveLocalUsers(localUsers);
   return newUser;
+}
+
+export async function updateUserApi(id: string, updates: Partial<PortalUser>): Promise<PortalUser | null> {
+  try {
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      const result = await res.json();
+      return result.data;
+    }
+  } catch (e) {
+    console.warn('API update user failed:', e);
+  }
+
+  const localUsers = getLocalUsers();
+  const idx = localUsers.findIndex((u) => u.id === id);
+  if (idx >= 0) {
+    localUsers[idx] = { ...localUsers[idx], ...updates };
+    saveLocalUsers(localUsers);
+    return localUsers[idx];
+  }
+  return null;
 }
 
 export async function toggleUserStatusApi(id: string): Promise<PortalUser | null> {

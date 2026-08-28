@@ -9,6 +9,7 @@ import {
   deleteEmployeeApi,
   fetchUsersApi,
   createUserApi,
+  updateUserApi,
   toggleUserStatusApi,
   deleteUserApi,
   fetchSettingsApi,
@@ -189,6 +190,24 @@ export default function App() {
     }
   };
 
+  const handleUpdateUser = async (userId: string, updates: Partial<PortalUser>) => {
+    try {
+      const updated = await updateUserApi(userId, updates);
+      const updatedList = await fetchUsersApi();
+      setUsers(updatedList);
+      
+      // If current user updated themselves, sync state
+      if (currentUserState && currentUserState.id === userId && updated) {
+        setCurrentUserState(updated);
+        setCurrentUser(updated);
+      }
+      
+      addToast('success', 'User Permissions Updated', `Authorization settings for ${updated?.name || 'User'} saved.`);
+    } catch (err) {
+      addToast('error', 'Update User Failed');
+    }
+  };
+
   // Settings Handlers
   const handleSaveSettings = async (newSettings: GlobalSettings) => {
     try {
@@ -199,6 +218,16 @@ export default function App() {
       addToast('error', 'Settings Save Failed');
     }
   };
+
+  // Filter employees based on Current User's Authorization Permissions
+  const authorizedEmployees = React.useMemo(() => {
+    if (!currentUserState) return [];
+    if (currentUserState.role === 'Admin' || currentUserState.authorizeAll !== false) {
+      return employees;
+    }
+    const allowedIds = new Set(currentUserState.authorizedEmployeeIds || []);
+    return employees.filter((emp) => allowedIds.has(emp.id));
+  }, [employees, currentUserState]);
 
   // If not logged in, show Login Page
   if (!currentUserState) {
@@ -219,7 +248,7 @@ export default function App() {
         onLogout={handleLogout}
         onNavigate={setCurrentTab}
         onOpenPdfUpload={() => setIsPdfModalOpen(true)}
-        employeeCount={employees.length}
+        employeeCount={authorizedEmployees.length}
       />
 
       {/* Main Layout Area */}
@@ -229,7 +258,7 @@ export default function App() {
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
           currentUser={currentUserState}
-          employeeCount={employees.length}
+          employeeCount={authorizedEmployees.length}
           userCount={users.length}
           onOpenPdfUpload={() => setIsPdfModalOpen(true)}
         />
@@ -238,7 +267,7 @@ export default function App() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-h-[calc(100vh-65px)]">
           {currentTab === 'dashboard' && (
             <DashboardView
-              employees={employees}
+              employees={authorizedEmployees}
               users={users}
               settings={settings}
               currentUser={currentUserState}
@@ -250,7 +279,7 @@ export default function App() {
 
           {currentTab === 'employees' && (
             <EmployeeListView
-              employees={employees}
+              employees={authorizedEmployees}
               settings={settings}
               onOpenPdfUpload={() => setIsPdfModalOpen(true)}
               onViewCard={(emp) => setSelectedCardEmp(emp)}
@@ -264,9 +293,11 @@ export default function App() {
             <UserManagementView
               users={users}
               currentUser={currentUserState}
+              employees={employees}
               onToggleStatus={handleToggleUserStatus}
               onDeleteUser={handleDeleteUser}
               onAddUser={handleAddUser}
+              onUpdateUser={handleUpdateUser}
             />
           )}
 

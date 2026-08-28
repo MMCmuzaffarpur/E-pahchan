@@ -4,12 +4,15 @@ export interface PortalUser {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   isActive: boolean;
   department?: string;
   avatarUrl?: string;
   createdAt: string;
   lastLogin?: string;
+  authorizedEmployeeIds?: string[]; // IDs of employees this user is authorized to view
+  authorizeAll?: boolean; // If true, can view all (Admin default or open operator)
 }
 
 export interface EmployeeFamilyMember {
@@ -37,6 +40,14 @@ export interface EmployeeRecord {
   appointmentDate?: string;
   dispensary?: string;
   branchOffice?: string;
+  registrationDate?: string;
+  familyMembers?: EmployeeFamilyMember[];
+  nominee?: {
+    name: string;
+    relation: string;
+    share?: string;
+    address?: string;
+  };
   
   // Photos and Signatures
   employeePhoto?: string; // base64 or url

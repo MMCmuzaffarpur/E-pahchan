@@ -20,34 +20,43 @@ const INITIAL_USERS: PortalUser[] = [
     id: 'user-admin-1',
     name: 'Chief Admin',
     email: 'admin@portal.gov.in',
+    password: 'Admin123',
     role: 'Admin',
     isActive: true,
     department: 'Card Administration & Verification',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
     createdAt: '2025-01-10T10:00:00.000Z',
     lastLogin: 'Today, 10:45 AM',
+    authorizeAll: true,
+    authorizedEmployeeIds: [],
   },
   {
     id: 'user-staff-2',
     name: 'Operator Vikash Kumar',
     email: 'user@portal.gov.in',
+    password: 'User123',
     role: 'User',
     isActive: true,
-    department: 'Data Entry & PDF Extraction Desk',
+    department: 'Muzaffarpur Municipal Cell',
     avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
     createdAt: '2025-02-01T11:30:00.000Z',
     lastLogin: 'Yesterday, 04:12 PM',
+    authorizeAll: false,
+    authorizedEmployeeIds: ['emp-100'], // Authorized only for Baby Devi (ESIC 4216776809)
   },
   {
     id: 'user-staff-3',
     name: 'Priya Sharma (Operator)',
     email: 'priya.operator@portal.gov.in',
+    password: 'User123',
     role: 'User',
-    isActive: false, // Inactive user example
-    department: 'Verification Unit',
+    isActive: true,
+    department: 'Tirhut Textile Verification Unit',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     createdAt: '2025-02-15T09:00:00.000Z',
     lastLogin: '3 days ago',
+    authorizeAll: false,
+    authorizedEmployeeIds: ['emp-102'], // Authorized for Sunita Devi
   },
 ];
 
@@ -206,11 +215,26 @@ export function deletePortalUser(userId: string): PortalUser[] {
   return users;
 }
 
+export function updatePortalUser(userId: string, updates: Partial<PortalUser>): PortalUser[] {
+  const users = getPortalUsers();
+  const updated = users.map((u) => {
+    if (u.id === userId) {
+      return { ...u, ...updates };
+    }
+    return u;
+  });
+  savePortalUsers(updated);
+  return updated;
+}
+
 export function addPortalUser(newUser: Omit<PortalUser, 'id' | 'createdAt'>): PortalUser[] {
   const users = getPortalUsers();
   const user: PortalUser = {
     ...newUser,
     id: 'user-' + Date.now(),
+    password: newUser.password || (newUser.role === 'Admin' ? 'Admin123' : 'User123'),
+    authorizeAll: newUser.authorizeAll ?? (newUser.role === 'Admin'),
+    authorizedEmployeeIds: newUser.authorizedEmployeeIds || [],
     createdAt: new Date().toISOString(),
     lastLogin: 'Never',
   };
