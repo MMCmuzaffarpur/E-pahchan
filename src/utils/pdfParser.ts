@@ -7,25 +7,38 @@ import {
   DEFAULT_FAMILY_PHOTO,
 } from './defaultAssets';
 
-// Setup pdf.js worker
+// Setup pdf.js worker for client-side fallback
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${
-    pdfjsLib.version || '3.11.174'
-  }/pdf.worker.min.js`;
-}
-
-interface TextItemPosition {
-  str: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 }
 
 /**
- * Extract raw text from PDF file with spatial line grouping and multi-page preservation
+ * Extract raw text from PDF file.
+ * Prioritizes server-side /api/extract-pdf (powered by Node pdf-parse)
+ * and falls back to client-side pdfjs-dist.
  */
 export async function extractTextFromPdf(file: File): Promise<string> {
+  // 1. Primary: Server-side high-precision extraction
+  try {
+    const base64Data = await fileToBase64(file);
+    const res = await fetch('/api/extract-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileBase64: base64Data, fileName: file.name }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.text && data.text.trim().length > 15) {
+        console.log(`✅ [PDF Text Extracted via Server]: ${data.text.length} chars`);
+        return data.text;
+      }
+    }
+  } catch (serverErr) {
+    console.warn('Server PDF extraction failed, attempting client-side fallback:', serverErr);
+  }
+
+  // 2. Secondary: Client-side pdfjsLib extraction
   try {
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -36,68 +49,51 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
 
-      const items: TextItemPosition[] = textContent.items
-        .map((item: any) => {
-          if (!item.str || !item.str.trim()) return null;
-          return {
-            str: item.str,
-            x: item.transform ? item.transform[4] : 0,
-            y: item.transform ? item.transform[5] : 0,
-            width: item.width || 0,
-            height: item.height || 0,
-          };
-        })
-        .filter(Boolean) as TextItemPosition[];
+      const items = textContent.items
+        .map((item: any) => item.str || '')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0);
 
-      // Group items with similar Y-coordinate (threshold ~ 5px)
-      const linesMap: { y: number; items: TextItemPosition[] }[] = [];
-      const Y_THRESHOLD = 5;
-
-      for (const item of items) {
-        let matchedLine = linesMap.find((line) => Math.abs(line.y - item.y) <= Y_THRESHOLD);
-        if (matchedLine) {
-          matchedLine.items.push(item);
-        } else {
-          linesMap.push({ y: item.y, items: [item] });
-        }
-      }
-
-      // Sort lines top to bottom (Y descending in PDF coordinates)
-      linesMap.sort((a, b) => b.y - a.y);
-
-      // In each line, sort items from left to right (X ascending)
-      const pageLines = linesMap.map((line) => {
-        line.items.sort((a, b) => a.x - b.x);
-        return line.items.map((it) => it.str.trim()).join(' ');
-      });
-
-      // Also generate direct stream string as backup
-      const directStream = textContent.items.map((it: any) => it.str || '').join(' ');
-
-      fullText += `\n--- PAGE ${i} ---\n` + pageLines.join('\n') + `\n[PAGE_${i}_STREAM]: ` + directStream + '\n';
+      fullText += `\n--- PAGE ${i} ---\n` + items.join('\n') + '\n';
     }
 
-    return fullText;
-  } catch (error) {
-    console.warn('PDF.js reading error, fallback to text reader:', error);
-    return await fallbackTextRead(file);
+    if (fullText.trim().length > 15) {
+      console.log(`✅ [PDF Text Extracted via Client PDF.js]: ${fullText.length} chars`);
+      return fullText;
+    }
+  } catch (clientErr) {
+    console.warn('Client PDF.js extraction failed:', clientErr);
   }
+
+  // If both automated methods fail, return a message prompting OCR paste
+  throw new Error('PDF text could not be extracted automatically. Please copy & paste the OCR text using the "Paste Transcript" tab.');
 }
 
-async function fallbackTextRead(file: File): Promise<string> {
-  return new Promise((resolve) => {
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result || 'Uploaded PDF Content');
-    };
-    reader.onerror = () => resolve('Uploaded PDF Content');
-    reader.readAsText(file);
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (err) => reject(err);
   });
 }
 
 /**
- * Robust, Master-Grade Parsing Engine for Government ESIC e-Pehchan & Registration PDFs
+ * Validates whether a given string is a genuine 10-digit ESIC IP / Insurance Number
+ */
+export function isValidIpNumber(ip: string | undefined | null): boolean {
+  if (!ip) return false;
+  const digits = String(ip).replace(/\D/g, '');
+  if (digits.length !== 10) return false;
+  // Cannot be all zeros, start with 00, or be repeating single digit
+  if (/^0{2,}/.test(digits)) return false;
+  if (/^(\d)\1{9}$/.test(digits)) return false;
+  return true;
+}
+
+/**
+ * Master Government ESIC e-Pehchan Transcript Parser
+ * Supports both Sequential Column OCR text & Standard Key-Value layouts.
  */
 export function parsePdfTranscript(rawText: string, fileName: string = ''): ParsedPdfResult {
   const lines = rawText
@@ -107,52 +103,123 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
 
   const cleanText = rawText.replace(/\s+/g, ' ');
 
-  // -------------------------------------------------------------
-  // 1. MOBILE NUMBER EXTRACTION (Extracted early to avoid IP confusion)
-  // -------------------------------------------------------------
-  let mobileNo = '';
-  const mobMatch =
-    cleanText.match(/(?:Mobile\s*Number|Mobile\s*No\.?|Phone\s*No\.?|Contact\s*No\.?|Mobile)[^\d]*[:\-]?\s*([6-9]\d{9})/i) ||
-    cleanText.match(/\b([6-9]\d{9})\b/);
+  // -------------------------------------------------------------------------
+  // MODE 1: SEQUENTIAL COLUMNAR OCR STRUCTURE (Exact match for ESIC Cards)
+  // -------------------------------------------------------------------------
+  let seqName = '';
+  let seqDob = '';
+  let seqGender = '';
+  let seqMobile = '';
+  let seqRegDate = '';
+  let seqIpNumber = '';
+  let seqFatherName = '';
+  let seqPresentAddress = '';
+  let seqPermanentAddress = '';
+  let seqDispensaryIp = '';
+  let seqDispensaryFamily = '';
 
-  if (mobMatch && mobMatch[1]) {
-    mobileNo = mobMatch[1].trim();
-  }
+  // Look for PERSONAL DETAILS section
+  const personalIdx = lines.findIndex((l) => /PERSONAL\s*DETAILS/i.test(l));
+  if (personalIdx !== -1) {
+    // Collect lines in PERSONAL DETAILS until REGISTRATION DETAILS or CURRENT EMPLOYER
+    const pLines: string[] = [];
+    for (let i = personalIdx + 1; i < lines.length; i++) {
+      if (/REGISTRATION\s*DETAILS|CURRENT\s*EMPLOYER/i.test(lines[i])) break;
+      pLines.push(lines[i]);
+    }
 
-  // -------------------------------------------------------------
-  // 2. INSURANCE NO. / IP NUMBER (10 digits) - HIGHEST PRECISION MULTI-LAYER
-  // -------------------------------------------------------------
-  let insuranceNo = '';
-
-  // Layer A: Dedicated Footer / Printed By IP Number (e.g. "IP Number : 4216789178")
-  const pageFooterIpMatch = cleanText.match(/(?:IP\s*Number|IP\s*No\.?|Insured\s*Person\s*Number)\s*[:\-]\s*(\d{10})/i);
-  if (pageFooterIpMatch && pageFooterIpMatch[1]) {
-    insuranceNo = pageFooterIpMatch[1].trim();
-  }
-
-  // Layer B: Direct "Insurance No. : 4216789178" or "Insurance No : 4216789178"
-  if (!insuranceNo) {
-    const directInsMatch = cleanText.match(/(?:Insurance\s*No\.?|Insurance\s*Number|e-Pehchan\s*No\.?|IP\s*#)[^\d:]*[:\-]?\s*(\d{10})/i);
-    if (directInsMatch && directInsMatch[1]) {
-      insuranceNo = directInsMatch[1].trim();
+    // Find the end of the label block (marked by 'Aadhaar' or 'ABHA Address' or 'Registration Date')
+    const aadhaarIdx = pLines.findIndex((l) => /^Aadhaar\s*:?$/i.test(l) || /^Aadhaar$/i.test(l));
+    if (aadhaarIdx !== -1 && aadhaarIdx + 1 < pLines.length) {
+      const valLines = pLines.slice(aadhaarIdx + 1).filter((l) => l.length > 0);
+      if (valLines.length >= 1) seqName = cleanExtractedString(valLines[0]);
+      if (valLines.length >= 2 && /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(valLines[1])) {
+        seqDob = normalizeDate(valLines[1]);
+      }
+      if (valLines.length >= 3 && /Male|Female|Other/i.test(valLines[2])) {
+        seqGender = valLines[2].toLowerCase().includes('female') ? 'Female' : 'Male';
+      }
+      if (valLines.length >= 4 && /[6-9]\d{9}/.test(valLines[3])) {
+        seqMobile = valLines[3].match(/[6-9]\d{9}/)![0];
+      }
+      if (valLines.length >= 6 && /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(valLines[5])) {
+        seqRegDate = normalizeDate(valLines[5]);
+      }
+      if (valLines.length >= 7 && /[1-9]\d{9}/.test(valLines[6])) {
+        const candidate = valLines[6].match(/[1-9]\d{9}/)![0];
+        if (isValidIpNumber(candidate)) seqIpNumber = candidate;
+      }
     }
   }
 
-  // Layer C: Search within lines near "Insurance No" or "IP Number"
+  // Look for REGISTRATION DETAILS section in sequential format
+  const regIdx = lines.findIndex((l) => /REGISTRATION\s*DETAILS/i.test(l));
+  if (regIdx !== -1) {
+    const rLines: string[] = [];
+    for (let i = regIdx + 1; i < lines.length; i++) {
+      if (/CURRENT\s*EMPLOYER|FAMILY\s*DETAILS/i.test(lines[i])) break;
+      rLines.push(lines[i]);
+    }
+
+    // Find the end of labels: 'IMP for Family' or 'Dispensary'
+    const lastLabelIdx = rLines.findIndex((l) => /IMP\s*for\s*Family|Dispensary\s*\/\s*IMP/i.test(l));
+    if (lastLabelIdx !== -1 && lastLabelIdx + 1 < rLines.length) {
+      const valLines = rLines.slice(lastLabelIdx + 1).filter((l) => l.length > 0);
+      // Format: Married, NA, Present Address..., Dispensary..., Father Name..., Permanent Address..., Dispensary...
+      if (valLines.length >= 3) {
+        // Line 0 is Married/Unmarried, Line 1 is NA/Disability, Line 2 is Present Address
+        seqPresentAddress = cleanAddressString(valLines.slice(2, 4).join(' '));
+      }
+      if (valLines.length >= 5) {
+        // Line 4 or 5 is Father / Husband Name
+        const possibleFather = valLines.find((vl) =>
+          /^[A-Z\s\.]{3,35}$/.test(vl) &&
+          !/Married|Dispensary|Chowk|School|Dist|Bihar|Road|Nagar|Disp/i.test(vl)
+        );
+        if (possibleFather) {
+          seqFatherName = cleanExtractedString(possibleFather);
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // MODE 2: DIRECT REGEX MATCHING (Highest Precision)
+  // -------------------------------------------------------------------------
+
+  // 1. IP / INSURANCE NUMBER (10 Digits)
+  let insuranceNo = seqIpNumber;
+
+  // A. Check Footer IP Number (e.g. "IP Number : 4216828319")
+  if (!insuranceNo) {
+    const footerIpMatch = cleanText.match(/(?:IP\s*Number|IP\s*No\.?|Insured\s*Person\s*Number)\s*[:\-]\s*([1-9]\d{9})/i);
+    if (footerIpMatch && isValidIpNumber(footerIpMatch[1])) {
+      insuranceNo = footerIpMatch[1];
+    }
+  }
+
+  // B. Check Direct "Insurance No. : 4216828319"
+  if (!insuranceNo) {
+    const directInsMatch = cleanText.match(/(?:Insurance\s*No\.?|Insurance\s*Number|बीमा\s*संख्या|e-Pehchan\s*No\.?)\s*[:\-]\s*([1-9]\d{9})/i);
+    if (directInsMatch && isValidIpNumber(directInsMatch[1])) {
+      insuranceNo = directInsMatch[1];
+    }
+  }
+
+  // C. Line by line scan near "Insurance No" or "IP Number"
   if (!insuranceNo) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (/Insurance\s*No|IP\s*Number|IP\s*No/i.test(line)) {
-        const lineDigits = line.match(/\b(\d{10})\b/);
-        if (lineDigits && lineDigits[1] && lineDigits[1] !== mobileNo) {
-          insuranceNo = lineDigits[1];
+      if (/Insurance\s*No|IP\s*Number|IP\s*No|बीमा\s*संख्या/i.test(line)) {
+        const m = line.match(/\b([1-9]\d{9})\b/);
+        if (m && isValidIpNumber(m[1])) {
+          insuranceNo = m[1];
           break;
         }
-        // Check next line
         if (i + 1 < lines.length) {
-          const nextDigits = lines[i + 1].match(/\b(\d{10})\b/);
-          if (nextDigits && nextDigits[1] && nextDigits[1] !== mobileNo) {
-            insuranceNo = nextDigits[1];
+          const mNext = lines[i + 1].match(/\b([1-9]\d{9})\b/);
+          if (mNext && isValidIpNumber(mNext[1])) {
+            insuranceNo = mNext[1];
             break;
           }
         }
@@ -160,203 +227,154 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // Layer D: Search for all 10-digit numbers in the document, excluding mobile and dates
-  if (!insuranceNo) {
-    const all10Digits = Array.from(cleanText.matchAll(/\b(\d{10})\b/g)).map((m) => m[1]);
-    const validIpCandidates = all10Digits.filter(
-      (num) => num !== mobileNo && !num.startsWith('0') && !num.startsWith('99999')
-    );
-    // Prefer number starting with 4, 3, 5, 2, 1 (typical ESIC IP range)
-    const preferredCandidate = validIpCandidates.find((num) => /^[43521]/.test(num));
-    if (preferredCandidate) {
-      insuranceNo = preferredCandidate;
-    } else if (validIpCandidates.length > 0) {
-      insuranceNo = validIpCandidates[0];
+  // D. Filename extraction (e.g. "ABHAY_4216828319.pdf")
+  if (!insuranceNo && fileName) {
+    const fnMatch = fileName.match(/\b([1-9]\d{9})\b/);
+    if (fnMatch && isValidIpNumber(fnMatch[1])) {
+      insuranceNo = fnMatch[1];
     }
   }
 
-  // Fallback if not found
+  // E. Scan entire text for any 10-digit number that starts with 1-9 (excluding mobile)
+  let mobileNo = seqMobile;
+  const mobMatch =
+    cleanText.match(/(?:Mobile\s*Number|Mobile\s*No\.?|Phone\s*No\.?|Contact\s*No\.?|Mobile)[^\d]*[:\-]?\s*([6-9]\d{9})/i) ||
+    cleanText.match(/\b([6-9]\d{9})\b/);
+  if (mobMatch && mobMatch[1]) {
+    mobileNo = mobMatch[1].trim();
+  }
+
   if (!insuranceNo) {
-    insuranceNo = '4216789178';
-  }
-
-  // -------------------------------------------------------------
-  // 3. EMPLOYEE FULL NAME (Name of IP)
-  // -------------------------------------------------------------
-  let name = '';
-  const nameOfIpMatch =
-    cleanText.match(/Name\s*of\s*IP\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Insurance|UHID|UAN|ABHA|Aadhaar|Date\s*of\s*Birth|DOB|Gender|Mobile|Email|Registration|Permanent|Present|Marital|$|\d{10}))/i) ||
-    cleanText.match(/(?:Name\s*of\s*Insured\s*Person|Insured\s*Person\s*Name|Employee\s*Name|IP\s*Name)\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Insurance|UHID|UAN|ABHA|Date|DOB|Gender|Mobile|Email|Registration|$|\d{10}))/i);
-
-  if (nameOfIpMatch && nameOfIpMatch[1] && nameOfIpMatch[1].trim().length > 1) {
-    name = cleanExtractedString(nameOfIpMatch[1]);
-  }
-
-  // Line-by-line fallback for Name of IP
-  if (!name || name.length < 2) {
-    for (let i = 0; i < lines.length; i++) {
-      if (/Name of IP/i.test(lines[i])) {
-        const remainingOnLine = lines[i].replace(/Name of IP/i, '').replace(/[:\-]/g, '').trim();
-        if (remainingOnLine.length > 2 && !/Date|Gender|Mobile|Insurance|DOB/i.test(remainingOnLine)) {
-          name = cleanExtractedString(remainingOnLine);
-          break;
-        } else if (i + 1 < lines.length && !/Date|Gender|Mobile|Insurance|DOB/i.test(lines[i + 1])) {
-          name = cleanExtractedString(lines[i + 1]);
-          break;
-        }
-      }
+    const all10Digits = Array.from(cleanText.matchAll(/\b([1-9]\d{9})\b/g)).map((m) => m[1]);
+    const candidates = all10Digits.filter((d) => isValidIpNumber(d) && d !== mobileNo);
+    if (candidates.length > 0) {
+      insuranceNo = candidates[0];
     }
   }
 
-  // -------------------------------------------------------------
-  // 4. DATE OF BIRTH (DOB)
-  // -------------------------------------------------------------
-  let dob = '';
-  const dobMatch =
-    cleanText.match(/(?:Date\s*of\s*Birth|DOB|D\.O\.B)\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i) ||
-    cleanText.match(/\b(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\b/);
+  // 2. EMPLOYEE FULL NAME (Name of IP)
+  let name = seqName;
+  if (!name) {
+    const nameMatch =
+      cleanText.match(/Name\s*of\s*IP\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Insurance|UHID|UAN|ABHA|Aadhaar|Date\s*of\s*Birth|DOB|Gender|Mobile|Email|Registration|Permanent|Present|Marital|$|\d{10}))/i) ||
+      cleanText.match(/(?:Name\s*of\s*Insured\s*Person|Insured\s*Person\s*Name|Employee\s*Name|IP\s*Name)\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Insurance|UHID|UAN|ABHA|Date|DOB|Gender|Mobile|Email|Registration|$|\d{10}))/i);
 
-  if (dobMatch && dobMatch[1]) {
-    dob = normalizeDate(dobMatch[1]);
-  } else {
-    dob = '1972-12-15';
+    if (nameMatch && nameMatch[1] && nameMatch[1].trim().length > 1) {
+      name = cleanExtractedString(nameMatch[1]);
+    }
   }
 
-  // -------------------------------------------------------------
-  // 5. GENDER (Male / Female)
-  // -------------------------------------------------------------
-  let gender: 'Male' | 'Female' | 'Other' = 'Male';
-  const genderMatch = cleanText.match(/(?:Gender|Sex)\s*[:\-]?\s*(Female|Male|Other)/i);
-  if (genderMatch && genderMatch[1]) {
-    gender = genderMatch[1].toLowerCase().includes('female') ? 'Female' : 'Male';
-  } else if (/\bFemale\b/i.test(cleanText) || /\b(?:Smt|Mrs|W\/O|D\/O|DEVI|KHATOON|BEGUM)\b/i.test(cleanText)) {
-    gender = 'Female';
-  } else if (/\bMale\b/i.test(cleanText)) {
-    gender = 'Male';
+  if (!name && fileName) {
+    name = fileName.replace(/\.pdf$/i, '').replace(/[_]/g, ' ').replace(/\d{8,}/g, '').trim();
   }
 
-  // Default mobile if not detected
-  if (!mobileNo) {
-    mobileNo = '7366899546';
+  // 3. DATE OF BIRTH (DOB)
+  let dob = seqDob;
+  if (!dob) {
+    const dobMatch =
+      cleanText.match(/(?:Date\s*of\s*Birth|DOB|D\.O\.B)\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i) ||
+      cleanText.match(/\b(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\b/);
+    if (dobMatch && dobMatch[1]) {
+      dob = normalizeDate(dobMatch[1]);
+    }
   }
 
-  // -------------------------------------------------------------
-  // 6. REGISTRATION DATE
-  // -------------------------------------------------------------
-  let registrationDate = '';
-  const regDateMatch = cleanText.match(/(?:Registration\s*Date|Date\s*of\s*Registration)\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
-  if (regDateMatch && regDateMatch[1]) {
-    registrationDate = normalizeDate(regDateMatch[1]);
-  } else {
-    registrationDate = '2023-05-18';
+  // 4. GENDER
+  let gender: 'Male' | 'Female' | 'Other' = (seqGender as any) || 'Male';
+  if (!seqGender) {
+    const genderMatch = cleanText.match(/(?:Gender|Sex)\s*[:\-]?\s*(Female|Male|Other)/i);
+    if (genderMatch && genderMatch[1]) {
+      gender = genderMatch[1].toLowerCase().includes('female') ? 'Female' : 'Male';
+    } else if (/\bFemale\b/i.test(cleanText) || /\b(?:Smt|Mrs|W\/O|D\/O|DEVI|KHATOON|BEGUM|KUMARI)\b/i.test(name)) {
+      gender = 'Female';
+    } else {
+      gender = 'Male';
+    }
   }
 
-  // -------------------------------------------------------------
-  // 7. FATHER / HUSBAND NAME
-  // -------------------------------------------------------------
-  let fatherOrHusbandName = '';
+  // 5. REGISTRATION DATE
+  let registrationDate = seqRegDate;
+  if (!registrationDate) {
+    const regMatch = cleanText.match(/(?:Registration\s*Date|Date\s*of\s*Registration)\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+    if (regMatch && regMatch[1]) {
+      registrationDate = normalizeDate(regMatch[1]);
+    }
+  }
+
+  // 6. FATHER / HUSBAND NAME
+  let fatherOrHusbandName = seqFatherName;
   let relationType: 'Father' | 'Husband' = gender === 'Female' ? 'Husband' : 'Father';
 
-  const fatherHusbandMatch =
-    cleanText.match(/(?:Name\s*of\s*Father\s*\/?\s*Husband|Father\s*\/?\s*Husband(?:'s)?\s*Name|Name\s*of\s*Husband|Husband['’]?s?\s*Name|Name\s*of\s*Father|Father['’]?s?\s*Name|S\/O|W\/O|D\/O)\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Permanent|Present|Address|Dispensary|Type|Marital|Disability|CURRENT|$))/i);
-
-  if (fatherHusbandMatch && fatherHusbandMatch[1] && fatherHusbandMatch[1].trim().length > 1) {
-    fatherOrHusbandName = cleanExtractedString(fatherHusbandMatch[1]);
+  if (!fatherOrHusbandName) {
+    const fatherMatch =
+      cleanText.match(/(?:Name\s*of\s*Father\s*\/?\s*Husband|Father\s*\/?\s*Husband(?:'s)?\s*Name|Name\s*of\s*Husband|Husband['’]?s?\s*Name|Name\s*of\s*Father|Father['’]?s?\s*Name|S\/O|W\/O|D\/O)\s*[:\-]?\s*([A-Za-z\s\.\'\-]{2,45}?)(?=\s+(?:Permanent|Present|Address|Dispensary|Type|Marital|Disability|CURRENT|$))/i);
+    if (fatherMatch && fatherMatch[1] && fatherMatch[1].trim().length > 1) {
+      fatherOrHusbandName = cleanExtractedString(fatherMatch[1]);
+    }
   }
 
-  if (cleanText.includes('Marital Status : Married') || cleanText.includes('Marital Status Married')) {
-    if (gender === 'Female') relationType = 'Husband';
+  // 7. RESIDENTIAL ADDRESS
+  let address = seqPresentAddress;
+  if (!address) {
+    const addrMatch =
+      cleanText.match(/(?:Present\s*Address|Permanent\s*Address|Residential\s*Address)\s*[:\-]?\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*(?:Dispensary|IMP\s*for|Permanent\s*Address|Name\s*of\s*Father|CURRENT\s*EMPLOYER|Employer's\s*Code|FAMILY\s*DETAILS|Branch\s*Office|Date|\n\n|$))/i) ||
+      cleanText.match(/Address\s*:\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*Date\s*:|\s*Page|\n|$)/i);
+    if (addrMatch && addrMatch[1] && addrMatch[1].trim().length > 5) {
+      address = cleanAddressString(addrMatch[1]);
+    }
   }
 
-  // -------------------------------------------------------------
-  // 8. RESIDENTIAL ADDRESS (Present & Permanent)
-  // -------------------------------------------------------------
-  let address = '';
-  const presentAddrMatch =
-    cleanText.match(/(?:Present\s*Address|Permanent\s*Address|Residential\s*Address)\s*[:\-]?\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*(?:Dispensary|IMP\s*for|Permanent\s*Address|Name\s*of\s*Father|CURRENT\s*EMPLOYER|Employer's\s*Code|FAMILY\s*DETAILS|Branch\s*Office|Date|\n\n|$))/i) ||
-    cleanText.match(/Address\s*:\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*Date\s*:|\s*Page|\n|$)/i);
-
-  if (presentAddrMatch && presentAddrMatch[1] && presentAddrMatch[1].trim().length > 5) {
-    address = cleanAddressString(presentAddrMatch[1]);
-  } else {
-    address = 'SADPURA KASAB TOLA NEAR KACHANA SONAR, Dist: Muzaffarpur, Bihar, 842002';
-  }
-
-  // Extract City, State, Pincode
   let city = 'Muzaffarpur';
   let state = 'Bihar';
-  let pincode = '842002';
+  let pincode = '842001';
 
-  const pinMatch = address.match(/\b(8\d{5}|[1-7]\d{5})\b/);
-  if (pinMatch) pincode = pinMatch[1];
+  if (address) {
+    const pinMatch = address.match(/\b(8\d{5}|[1-7]\d{5})\b/);
+    if (pinMatch) pincode = pinMatch[1];
+    const distMatch = address.match(/Dist\s*:\s*([A-Za-z]+)/i);
+    if (distMatch) city = distMatch[1].trim();
+    if (address.toLowerCase().includes('bihar')) state = 'Bihar';
+  }
 
-  const distMatch = address.match(/Dist\s*:\s*([A-Za-z]+)/i);
-  if (distMatch) city = distMatch[1].trim();
-
-  if (address.toLowerCase().includes('bihar')) state = 'Bihar';
-
-  // -------------------------------------------------------------
-  // 9. CURRENT EMPLOYER DETAILS
-  // -------------------------------------------------------------
-  // Employer Code (17 digits e.g. 42001884020000908)
+  // 8. EMPLOYER DETAILS
   let employerCode = '';
   const empCodeMatch = cleanText.match(/(?:Employer(?:'s)?\s*Code\s*No\.?|Employer\s*Code|Est\s*Code|Establishment\s*Code)[^\d:]*[:\-]?\s*(\d{10,18})/i);
   if (empCodeMatch) {
     employerCode = empCodeMatch[1].trim();
-  } else {
-    employerCode = '42001884020000908';
   }
 
-  // Employer Name (e.g. MUZAFFARPUR MUNICIPAL CORPORATION)
   let employerName = '';
   const empNameMatch =
     cleanText.match(/(?:Name\s*of\s*Employer|Employer\s*Name|Establishment\s*Name|Printed\s*By\s*\([^)]*\))\s*[:\-]?\s*([A-Za-z0-9\s,\.\(\)&\'\-]{3,60}?)(?=\s+(?:Sub\s*Unit|Date\s*of\s*Appointment|Appointment|Address\s*of\s*Employer|Branch\s*Office|IP\s*Number|FAMILY\s*DETAILS|\n|$))/i);
-
-  if (empNameMatch && empNameMatch[1] && empNameMatch[1].trim().length > 2) {
+  if (empNameMatch && empNameMatch[1]) {
     employerName = cleanExtractedString(empNameMatch[1]);
-  } else {
-    employerName = 'MUZAFFARPUR MUNICIPAL CORPORATION';
   }
 
-  // Date of Appointment: 10/05/2023
   let appointmentDate = '';
   const appDateMatch = cleanText.match(/(?:Date\s*of\s*Appointment|Appointment\s*Date|Date\s*of\s*Joining)\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
   if (appDateMatch && appDateMatch[1]) {
     appointmentDate = normalizeDate(appDateMatch[1]);
-  } else {
-    appointmentDate = '2023-05-10';
   }
 
-  // Address of Employer: Near Muzaffarpur Railway Station,Civil Court Campus,Hpo Ps Town,Dist:MuzaffarpurBihar842001
   let employerAddress = '';
   const empAddrMatch = cleanText.match(/(?:Address\s*of\s*Employer|Employer\s*Address)\s*[:\-]?\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*(?:Branch\s*Office|FAMILY\s*DETAILS|Sub\s*Unit|Page|\n\n|$))/i);
   if (empAddrMatch && empAddrMatch[1]) {
     employerAddress = cleanAddressString(empAddrMatch[1]);
-  } else {
-    employerAddress = 'Near Muzaffarpur Railway Station, Civil Court Campus, Hpo Ps Town, Dist: Muzaffarpur Bihar 842001';
   }
 
-  // Branch Office: DCBO - Muzaffarpur,ESIC DCBO, Behind S.B.I. Bhagwanpur Chowk
   let branchOffice = '';
   const branchMatch = cleanText.match(/(?:Branch\s*Office)\s*[:\-]?\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s*(?:FAMILY\s*DETAILS|Name\s*Relation|Page|\n\n|$))/i);
   if (branchMatch && branchMatch[1]) {
     branchOffice = cleanAddressString(branchMatch[1]);
-  } else {
-    branchOffice = 'DCBO - Muzaffarpur, ESIC DCBO, Behind S.B.I. Bhagwanpur Chowk';
   }
 
-  // Dispensary: Kalambagh Chowk, BH (ESIS Disp.)
   let dispensary = '';
   const dispMatch = cleanText.match(/(?:Dispensary\s*\/?\s*IMP\s*for\s*IP|Dispensary\s*for\s*IP|Dispensary)\s*[:\-]?\s*([A-Za-z0-9\s,\.\(\)\-]+?)(?=\s*(?:Dispensary\s*\/?\s*IMP\s*for\s*Family|Name\s*of\s*Father|Permanent|CURRENT\s*EMPLOYER|Employer's\s*Code|$))/i);
   if (dispMatch && dispMatch[1]) {
     dispensary = cleanExtractedString(dispMatch[1]);
-  } else {
-    dispensary = 'Kalambagh Chowk, BH (ESIS Disp.)';
   }
 
-  // -------------------------------------------------------------
-  // 10. FAMILY MEMBERS EXTRACTION (Pages 1 & 2)
-  // -------------------------------------------------------------
+  // 9. FAMILY MEMBERS
   const familyMembers: EmployeeFamilyMember[] = [];
   const knownRelations = ['Spouse', 'Dependant unmarried daughter', 'Minor dependant son', 'Father', 'Mother', 'Son', 'Daughter', 'Wife', 'Husband'];
 
@@ -375,9 +393,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // -------------------------------------------------------------
-  // 11. NOMINEE EXTRACTION (Page 3)
-  // -------------------------------------------------------------
+  // 10. NOMINEE
   let nominee = undefined;
   const nomineeMatch = cleanText.match(/(?:NOMINEE\s*DETAILS|Nominee)[^\n:]*[:\s]*([A-Za-z\s\.]+)\s*\|\s*([A-Za-z\s]+)\s*\|[^\d]*(\d{1,3}%?)/i);
   if (nomineeMatch) {
@@ -388,33 +404,25 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     };
   }
 
-  // Final check for name & father name fallbacks
-  if (!name) {
-    name = fileName ? fileName.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ') : 'ABDUL MOGANI ANSARI';
-  }
-  if (!fatherOrHusbandName) {
-    fatherOrHusbandName = 'MD SAMI ANSARI';
-  }
-
   const fields: Partial<EmployeeRecord> = {
-    insuranceNo,
-    name,
+    insuranceNo: insuranceNo || '',
+    name: name || 'Employee',
     gender,
-    fatherOrHusbandName,
+    fatherOrHusbandName: fatherOrHusbandName || '',
     relationType,
-    dob,
-    mobileNo,
-    registrationDate,
-    address,
+    dob: dob || '',
+    mobileNo: mobileNo || '',
+    registrationDate: registrationDate || '',
+    address: address || '',
     city,
     state,
     pincode,
-    employerName,
-    employerCode,
-    employerAddress,
-    appointmentDate,
-    dispensary,
-    branchOffice,
+    employerName: employerName || 'MUZAFFARPUR MUNICIPAL CORPORATION',
+    employerCode: employerCode || '42001884020000908',
+    employerAddress: employerAddress || 'Near Muzaffarpur Railway Station, Civil Court Campus, Muzaffarpur Bihar 842001',
+    appointmentDate: appointmentDate || '',
+    dispensary: dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)',
+    branchOffice: branchOffice || 'DCBO - Muzaffarpur, ESIC DCBO, Behind S.B.I. Bhagwanpur Chowk',
     familyMembers: familyMembers.length > 0 ? familyMembers : undefined,
     nominee,
     employeePhoto: gender === 'Female' ? DEFAULT_AVATAR_FEMALE : DEFAULT_AVATAR_MALE,
@@ -426,7 +434,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
   return {
     rawText,
     fields,
-    confidence: 0.99,
+    confidence: isValidIpNumber(insuranceNo) && name ? 0.99 : 0.85,
     extractedLines: lines.slice(0, 80),
   };
 }
@@ -471,7 +479,7 @@ function normalizeDate(raw: string): string {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
   } catch (e) {}
-  return '1972-12-15';
+  return '';
 }
 
 /**
@@ -479,6 +487,36 @@ function normalizeDate(raw: string): string {
  */
 export function getSamplePdfDemoData(index: number = 0): ParsedPdfResult {
   const sampleProfiles = [
+    {
+      name: 'ABHAY KUMAR SHARMA',
+      gender: 'Male' as const,
+      fatherOrHusbandName: 'BAIDHNATH THAKUR',
+      relationType: 'Father' as const,
+      dob: '1981-02-10',
+      mobileNo: '8674893878',
+      insuranceNo: '4216828319',
+      registrationDate: '2023-07-11',
+      address: 'NEAR MIDDILE SCHOOL SADPUR, Dist: Muzaffarpur, Bihar, 842001',
+      city: 'Muzaffarpur',
+      state: 'Bihar',
+      pincode: '842001',
+      employerName: 'MUZAFFARPUR MUNICIPAL CORPORATION',
+      employerCode: '42001884020000908',
+      employerAddress: 'Near Muzaffarpur Railway Station, Civil Court Campus, Hpo Ps Town, Dist: Muzaffarpur Bihar 842001',
+      dispensary: 'Kalambagh Chowk, BH (ESIS Disp.)',
+      branchOffice: 'DCBO - Muzaffarpur, ESIC DCBO, Behind S.B.I. Bhagwanpur Chowk',
+      appointmentDate: '2023-07-08',
+      fileName: 'ESIC_ePehchan_Abhay_Kumar_Sharma_4216828319.pdf',
+      familyMembers: [
+        { name: 'ANAHITA KUMARI', relation: 'Dependant unmarried daughter', dob: '2017-09-09' },
+        { name: 'ANANYA KUMARI', relation: 'Dependant unmarried daughter', dob: '2019-05-17' },
+      ],
+      nominee: {
+        name: 'ANITA THAKUR',
+        relation: 'Spouse',
+        share: '100%',
+      },
+    },
     {
       name: 'ABDUL MOGANI ANSARI',
       gender: 'Male' as const,
@@ -540,50 +578,6 @@ export function getSamplePdfDemoData(index: number = 0): ParsedPdfResult {
         relation: 'Minor dependant son',
         share: '100%',
       },
-    },
-    {
-      name: 'Ramesh Kumar Verma',
-      gender: 'Male' as const,
-      fatherOrHusbandName: 'Late Suresh Prasad Verma',
-      relationType: 'Father' as const,
-      dob: '1989-04-12',
-      mobileNo: '9835124578',
-      insuranceNo: '3109845621',
-      registrationDate: '2021-03-01',
-      address: 'Ward No 14, Main Road Juran Chapra, Muzaffarpur',
-      city: 'Muzaffarpur',
-      state: 'Bihar',
-      pincode: '842001',
-      employerName: 'BHARAT LOGISTICS & COURIER CORP',
-      employerCode: '21000854630000901',
-      employerAddress: 'Plot 45, Transport Nagar, Patna Highway',
-      dispensary: 'ESIC Dispensary Bela Industrial Area',
-      branchOffice: 'ESIC Sub-Regional Office Muzaffarpur',
-      appointmentDate: '2021-03-01',
-      fileName: 'ESIC_Pehchan_Ramesh_Verma.pdf',
-      familyMembers: [],
-    },
-    {
-      name: 'Sunita Devi',
-      gender: 'Female' as const,
-      fatherOrHusbandName: 'Manoj Kumar Gupta',
-      relationType: 'Husband' as const,
-      dob: '1994-11-20',
-      mobileNo: '9431876543',
-      insuranceNo: '3114589632',
-      registrationDate: '2022-06-15',
-      address: 'Quarter No 88, Sugar Mill Colony, Motihari Road',
-      city: 'Muzaffarpur',
-      state: 'Bihar',
-      pincode: '842002',
-      employerName: 'TIRHUT TEXTILE & GARMENTS PVT LTD',
-      employerCode: '11000784960001002',
-      employerAddress: 'Industrial Growth Centre, Muzaffarpur',
-      dispensary: 'ESIC Model Hospital Phulwarisharif',
-      branchOffice: 'ESIC Branch Office Kanti',
-      appointmentDate: '2022-06-15',
-      fileName: 'Pehchan_Card_Sunita_Devi.pdf',
-      familyMembers: [],
     },
   ];
 

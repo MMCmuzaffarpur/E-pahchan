@@ -16,7 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { EmployeeRecord, ParsedPdfResult } from '../types';
-import { extractTextFromPdf, parsePdfTranscript, getSamplePdfDemoData } from '../utils/pdfParser';
+import { extractTextFromPdf, parsePdfTranscript, getSamplePdfDemoData, isValidIpNumber } from '../utils/pdfParser';
 import confetti from 'canvas-confetti';
 
 interface PdfUploadModalProps {
@@ -113,30 +113,35 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
   };
 
   const handleSaveToDatabase = () => {
-    if (!formFields.name || !formFields.insuranceNo) {
-      setErrorMsg('Please ensure Name and Insurance No (IP Number) are populated before saving.');
+    if (!formFields.name?.trim()) {
+      setErrorMsg('Please enter Employee Full Name (कर्मचारी का नाम).');
+      return;
+    }
+
+    if (!formFields.insuranceNo || !isValidIpNumber(formFields.insuranceNo)) {
+      setErrorMsg('Please enter a valid 10-digit Insurance / IP Number (0000000000 is invalid). e.g. 4216789178');
       return;
     }
 
     const employeeToSave: Omit<EmployeeRecord, 'id' | 'createdAt' | 'updatedAt'> = {
-      insuranceNo: formFields.insuranceNo || '4216789178',
+      insuranceNo: formFields.insuranceNo.trim(),
       name: formFields.name || 'New Employee',
       gender: formFields.gender || 'Male',
       fatherOrHusbandName: formFields.fatherOrHusbandName || '',
-      relationType: formFields.relationType || 'Father',
-      dob: formFields.dob || '1972-12-15',
+      relationType: formFields.relationType || (formFields.gender === 'Female' ? 'Husband' : 'Father'),
+      dob: formFields.dob || '',
       mobileNo: formFields.mobileNo || '',
-      registrationDate: formFields.registrationDate || '2023-05-18',
+      registrationDate: formFields.registrationDate || '',
       address: formFields.address || '',
       city: formFields.city || 'Muzaffarpur',
       state: formFields.state || 'Bihar',
-      pincode: formFields.pincode || '842002',
+      pincode: formFields.pincode || '842001',
       employerName: formFields.employerName || 'MUZAFFARPUR MUNICIPAL CORPORATION',
       employerCode: formFields.employerCode || '42001884020000908',
       employerAddress: formFields.employerAddress || '',
-      appointmentDate: formFields.appointmentDate || '2023-05-10',
-      dispensary: formFields.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)',
-      branchOffice: formFields.branchOffice || 'DCBO - Muzaffarpur, ESIC DCBO',
+      appointmentDate: formFields.appointmentDate || '',
+      dispensary: formFields.dispensary || '',
+      branchOffice: formFields.branchOffice || '',
       familyMembers: formFields.familyMembers,
       nominee: formFields.nominee,
       employeePhoto: formFields.employeePhoto,
@@ -449,28 +454,58 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   {/* IP Number & Name Header Card */}
                   <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/40 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-amber-300 mb-1 flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Insurance No / IP Number (बीमा संख्या - 10 अंक) *</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-amber-300 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Insurance No / IP Number (बीमा संख्या - 10 अंक) *</span>
+                        </label>
+                        {isValidIpNumber(formFields.insuranceNo) ? (
+                          <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Valid 10 Digits
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> 10 Digits Required (Non-zero)
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
+                        maxLength={10}
+                        placeholder="e.g. 4216789178"
                         value={formFields.insuranceNo || ''}
-                        onChange={(e) => handleFieldChange('insuranceNo', e.target.value)}
-                        className="w-full bg-slate-950 border-2 border-amber-500/60 rounded-xl px-3 py-2 text-sm text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          handleFieldChange('insuranceNo', val);
+                        }}
+                        className={`w-full bg-slate-950 border-2 rounded-xl px-3 py-2 text-sm font-mono font-bold focus:outline-none transition-colors ${
+                          isValidIpNumber(formFields.insuranceNo)
+                            ? 'border-emerald-500/80 text-emerald-300 focus:border-emerald-400'
+                            : 'border-rose-500/80 text-rose-300 focus:border-amber-400'
+                        }`}
                       />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        ESIC 10-अंक की बीमा संख्या। अगर PDF में शून्य (0000000000) था, तो सही 10-अंक का IP नंबर यहाँ दर्ज करें।
+                      </p>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-200 mb-1">
-                        Employee Full Name / Name of IP (कर्मचारी का नाम) *
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-200">
+                          Employee Full Name / Name of IP (कर्मचारी का नाम) *
+                        </label>
+                        <span className="text-[10px] text-slate-400">As per ESIC Record</span>
+                      </div>
                       <input
                         type="text"
+                        placeholder="e.g. ABHISHEK MASIH"
                         value={formFields.name || ''}
                         onChange={(e) => handleFieldChange('name', e.target.value)}
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:border-blue-500"
                       />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        कर्मचारी का पूरा नाम (पासपोर्ट एवं पहचान पत्र के अनुसार)
+                      </p>
                     </div>
                   </div>
 

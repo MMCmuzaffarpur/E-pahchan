@@ -15,8 +15,11 @@ import {
   CheckCircle2,
   FileText,
   AlertTriangle,
+  Check,
+  X as CloseIcon,
 } from 'lucide-react';
 import { EmployeeRecord, GlobalSettings } from '../types';
+import { isValidIpNumber } from '../utils/pdfParser';
 
 interface EmployeeListViewProps {
   employees: EmployeeRecord[];
@@ -26,6 +29,7 @@ interface EmployeeListViewProps {
   onEditEmployee: (emp: EmployeeRecord) => void;
   onDeleteEmployee: (id: string, name: string) => void;
   onOpenPrintPreview: (emp: EmployeeRecord) => void;
+  onUpdateEmployee?: (id: string, updates: Partial<EmployeeRecord>) => void;
 }
 
 export const EmployeeListView: React.FC<EmployeeListViewProps> = ({
@@ -36,10 +40,33 @@ export const EmployeeListView: React.FC<EmployeeListViewProps> = ({
   onEditEmployee,
   onDeleteEmployee,
   onOpenPrintPreview,
+  onUpdateEmployee,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Inline Quick Edit for IP Number
+  const [editingIpEmpId, setEditingIpEmpId] = useState<string | null>(null);
+  const [editingIpValue, setEditingIpValue] = useState<string>('');
+
+  const handleStartEditIp = (emp: EmployeeRecord) => {
+    setEditingIpEmpId(emp.id);
+    setEditingIpValue(emp.insuranceNo === '0000000000' ? '' : emp.insuranceNo);
+  };
+
+  const handleSaveInlineIp = (empId: string) => {
+    const cleaned = editingIpValue.trim();
+    if (cleaned && onUpdateEmployee) {
+      onUpdateEmployee(empId, { insuranceNo: cleaned });
+    }
+    setEditingIpEmpId(null);
+  };
+
+  const handleCancelInlineIp = () => {
+    setEditingIpEmpId(null);
+    setEditingIpValue('');
+  };
 
   const filteredEmployees = employees.filter((emp) => {
     const matchSearch =
@@ -162,9 +189,61 @@ export const EmployeeListView: React.FC<EmployeeListViewProps> = ({
 
                   {/* Insurance No */}
                   <td className="py-3.5 px-4">
-                    <span className="inline-block px-2.5 py-1 rounded-lg font-mono font-bold text-amber-300 bg-amber-950/60 border border-amber-800/60 text-xs">
-                      {emp.insuranceNo}
-                    </span>
+                    {editingIpEmpId === emp.id ? (
+                      <div className="flex items-center gap-1.5 min-w-[150px]">
+                        <input
+                          type="text"
+                          maxLength={10}
+                          value={editingIpValue}
+                          onChange={(e) => setEditingIpValue(e.target.value)}
+                          placeholder="10-digit IP No"
+                          className="w-28 bg-slate-950 border-2 border-amber-400 rounded-lg px-2 py-1 text-xs font-mono font-bold text-amber-300 focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveInlineIp(emp.id);
+                            if (e.key === 'Escape') handleCancelInlineIp();
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveInlineIp(emp.id)}
+                          title="Save IP Number"
+                          className="p-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={handleCancelInlineIp}
+                          title="Cancel"
+                          className="p-1 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 cursor-pointer"
+                        >
+                          <CloseIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group/ip">
+                        {!isValidIpNumber(emp.insuranceNo) || emp.insuranceNo === '0000000000' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditIp(emp)}
+                            title="Click to fix IP Number (आईपी नंबर दर्ज करें)"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono font-bold text-rose-300 bg-rose-950/80 border border-rose-600/80 text-xs hover:border-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow animate-pulse"
+                          >
+                            <AlertTriangle className="w-3 h-3 text-rose-400" />
+                            <span>{emp.insuranceNo || 'Fix IP No'}</span>
+                            <Edit3 className="w-2.5 h-2.5 ml-0.5 text-amber-400" />
+                          </button>
+                        ) : (
+                          <span
+                            onClick={() => handleStartEditIp(emp)}
+                            title="Click to edit IP Number"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono font-bold text-amber-300 bg-amber-950/60 border border-amber-800/60 text-xs hover:border-amber-400 transition-all cursor-pointer"
+                          >
+                            <span>{emp.insuranceNo}</span>
+                            <Edit3 className="w-2.5 h-2.5 opacity-0 group-hover/ip:opacity-100 text-amber-400 transition-opacity" />
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
 
                   {/* Gender & DOB */}

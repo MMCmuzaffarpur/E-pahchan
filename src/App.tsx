@@ -286,6 +286,7 @@ export default function App() {
               onEditEmployee={(emp) => setEditingEmp(emp)}
               onDeleteEmployee={handleDeleteEmployee}
               onOpenPrintPreview={(emp) => setPrintPreviewEmp(emp)}
+              onUpdateEmployee={handleUpdateEmployee}
             />
           )}
 

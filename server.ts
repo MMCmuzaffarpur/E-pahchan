@@ -138,6 +138,40 @@ async function startServer() {
     });
   });
 
+  // 1.1 PDF Raw Text Extraction Endpoint (Ultra-fast server-side parser with pdf-parse)
+  app.post('/api/extract-pdf', async (req: Request, res: Response) => {
+    try {
+      const { fileBase64, fileName } = req.body;
+      if (!fileBase64) {
+        return res.status(400).json({ success: false, error: 'No PDF file base64 data provided' });
+      }
+
+      // Remove base64 header if present
+      const cleanBase64 = fileBase64.replace(/^data:application\/pdf;base64,/, '').replace(/^data:[^;]+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      // Dynamically import pdf-parse to ensure safe loading
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+      
+      const pdfData = await pdfParse(buffer);
+      console.log(`📄 [PDF Parser] Extracted ${pdfData.text?.length || 0} characters from ${fileName || 'uploaded PDF'} (${pdfData.numpages} pages)`);
+
+      return res.json({
+        success: true,
+        text: pdfData.text || '',
+        numPages: pdfData.numpages || 1,
+        info: pdfData.info || {},
+      });
+    } catch (err: any) {
+      console.error('❌ [PDF Extract Error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Failed to extract text from PDF on server',
+      });
+    }
+  });
+
   app.get('/api/db-status', (req: Request, res: Response) => {
     res.json({
       success: true,
