@@ -11,8 +11,8 @@ import {
 import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
 
-// Aapka upload kiya hua official ESIC logo
-const ESIC_ROUND_LOGO = '/logo.jpg';
+// Aapke uploaded logo ka path
+const ESIC_ROUND_LOGO = '/assets/logo.png';
 
 interface IdCardModalProps {
   isOpen: boolean;
@@ -244,7 +244,7 @@ export const FrontCardView: React.FC<{
   settings: GlobalSettings;
 }> = ({ employee }) => {
   return (
-    <div className="w-full h-full bg-[#fcfcfd] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
+    <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
       {/* 1. TOP HEADER: Deep Blue with Center ESIC Maroon Emblem */}
       <div className="bg-[#0b3c75] text-white px-3 py-2 flex items-center justify-between relative border-b-2 border-[#00b4d8]">
         {/* Left Header */}
@@ -263,10 +263,13 @@ export const FrontCardView: React.FC<{
             src={ESIC_ROUND_LOGO}
             alt="ESIC Emblem"
             onError={(e) => {
-              // Fallback if file path differs
-              (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/4/4e/ESIC_Logo.svg';
+              // Alternate paths if relative location varies
+              const img = e.target as HTMLImageElement;
+              if (!img.src.includes('logo.png')) {
+                img.src = '/logo.png';
+              }
             }}
-            className="w-9 h-9 rounded-full shadow-md object-contain"
+            className="w-10 h-10 rounded-full shadow-md object-contain bg-white p-0.5"
           />
         </div>
 
@@ -282,7 +285,7 @@ export const FrontCardView: React.FC<{
       </div>
 
       {/* 2. CARD BODY: Left Clean Details + Right Blank Photo Box */}
-      <div className="flex-1 p-3 flex gap-3 items-center">
+      <div className="flex-1 p-3 flex gap-3 items-center bg-white">
         {/* Left Information */}
         <div className="flex-1 space-y-1.5 text-[9px] sm:text-[10px] text-slate-800">
           <div className="flex items-baseline">
@@ -328,7 +331,7 @@ export const FrontCardView: React.FC<{
           </div>
         </div>
 
-        {/* Right: Pure Blank Photo Box with Border Only (No Photo Inside) */}
+        {/* Right: Blank Photo Box (Only Border - No Sunset/Beach Photo) */}
         <div className="shrink-0 flex flex-col items-center justify-center">
           <div className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded border border-slate-400 bg-white shadow-inner flex flex-col items-center justify-center">
             <span className="text-[7.5px] font-semibold text-slate-400 uppercase tracking-wider text-center leading-tight">
@@ -349,20 +352,26 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Clean Blue Ink Signature - Transparent BG - No Underline)
+   BACK CARD VIEW COMPONENT (Blue Signature - Transparent BG - No Underline)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee, settings }) => {
-  // Clean up any stray table headers like "r " from names
+  // Clean up table names
   const cleanFamily = (employee.familyMembers || []).map((f) => ({
     ...f,
     name: f.name.replace(/^r\s+/i, '').replace(/^(?:Is\s*Residing|with\s*IP)\s*/i, '').trim(),
   }));
 
+  // Check if signature is genuine or just the default dummy wavy line SVG
+  const isGenuineSignature =
+    employee.employeeSignature &&
+    !employee.employeeSignature.includes('M 15 40 C 30 15') &&
+    employee.employeeSignature.trim().length > 30;
+
   return (
-    <div className="w-full h-full bg-[#fcfcfd] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
+    <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
       {/* 1. TOP HEADER */}
       <div className="bg-[#0b3c75] text-white px-3 py-1.5 flex items-center justify-between border-b border-[#00b4d8]">
         <span className="text-[9px] font-bold tracking-wide">
@@ -373,8 +382,8 @@ export const BackCardView: React.FC<{
         </span>
       </div>
 
-      {/* 2. BODY: Family Table, Details & Signatures */}
-      <div className="flex-1 p-2.5 flex flex-col justify-between text-[8px] sm:text-[8.5px]">
+      {/* 2. BODY: Family Table, Details & Authentic Signatures */}
+      <div className="flex-1 p-2.5 flex flex-col justify-between text-[8px] sm:text-[8.5px] bg-white">
         {/* Family Table */}
         <div>
           <table className="w-full border-collapse text-[7.5px] sm:text-[8px] text-slate-800">
@@ -427,22 +436,24 @@ export const BackCardView: React.FC<{
           </div>
         </div>
 
-        {/* Signatures Area: No Underline, Clean Transparent BG & Blue Ink Filter */}
+        {/* Signatures Area: No Underline, Transparent Background & Pure Royal Blue Ink */}
         <div className="flex items-end justify-between pt-1 px-4 text-[7px]">
-          {/* Employee Sign Box */}
+          {/* Employee Sign Box (Thedha wavy line removed!) */}
           <div className="flex flex-col items-center w-32">
-            <div className="h-8 flex items-center justify-center bg-transparent">
-              {employee.employeeSignature ? (
+            <div className="h-8 w-full flex items-center justify-center bg-transparent">
+              {isGenuineSignature ? (
                 <img
                   src={employee.employeeSignature}
                   alt="Employee Signature"
-                  className="max-h-full max-w-full object-contain mix-blend-multiply"
+                  className="max-h-full max-w-full object-contain"
                   style={{
-                    // Royal Blue Ink Filter
-                    filter: 'invert(16%) sepia(98%) saturate(6000%) hue-rotate(220deg) brightness(85%) contrast(125%)',
+                    // Pure Ball-Pen Blue Ink
+                    filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
+                    mixBlendMode: 'multiply',
                   }}
                 />
               ) : (
+                /* Blank when not uploaded - NO WAVY LINE */
                 <span className="text-[7.5px] text-slate-300 italic">Sign / LTI</span>
               )}
             </div>
@@ -451,17 +462,19 @@ export const BackCardView: React.FC<{
             </span>
           </div>
 
-          {/* Employer Sign Box (Pink BG Removed, Transparent & Blue Ink) */}
+          {/* Employer Sign Box (Transparent BG & Blue Ink - Pink BG Removed!) */}
           <div className="flex flex-col items-center w-32">
-            <div className="h-8 flex items-center justify-center bg-transparent relative">
+            <div className="h-8 w-full flex items-center justify-center bg-transparent">
               {settings.employerSignature ? (
                 <img
                   src={settings.employerSignature}
                   alt="Employer Signature"
-                  className="max-h-full max-w-full object-contain mix-blend-multiply"
+                  className="max-h-full max-w-full object-contain"
                   style={{
-                    // Authentic Blue Ink Filter
-                    filter: 'invert(16%) sepia(98%) saturate(6000%) hue-rotate(220deg) brightness(85%) contrast(125%)',
+                    // Authentic Blue Ink Filter on Transparent Canvas
+                    filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
+                    mixBlendMode: 'multiply',
+                    backgroundColor: 'transparent',
                   }}
                 />
               ) : null}
