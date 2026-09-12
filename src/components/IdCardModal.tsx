@@ -11,7 +11,7 @@ import {
 import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
 
-// 100% Fail-Proof Embedded Logo (Never breaks on any browser or deployment)
+// Correct path import through utility
 import { ESIC_EMBEDDED_LOGO } from '../utils/esicLogoData';
 
 interface IdCardModalProps {
@@ -266,7 +266,7 @@ export const FrontCardView: React.FC<{
           </p>
         </div>
 
-        {/* Center: Uploaded Official ESIC Logo */}
+        {/* Center: Official ESIC Logo from Assets */}
         <div className="shrink-0 px-2 flex items-center justify-center">
           <img
             src={ESIC_EMBEDDED_LOGO}
@@ -333,7 +333,7 @@ export const FrontCardView: React.FC<{
           </div>
         </div>
 
-        {/* Right: Blank Photo Box (Only Border) */}
+        {/* Right: Pure Blank Photo Box with Border Only */}
         <div className="shrink-0 flex flex-col items-center justify-center">
           <div className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded border border-slate-400 bg-white/90 shadow-inner flex flex-col items-center justify-center">
             <span className="text-[7.5px] font-semibold text-slate-400 uppercase tracking-wider text-center leading-tight">
@@ -360,13 +360,11 @@ export const BackCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee, settings }) => {
-  // Clean up table names
   const cleanFamily = (employee.familyMembers || []).map((f) => ({
     ...f,
     name: f.name.replace(/^r\s+/i, '').replace(/^(?:Is\s*Residing|with\s*IP)\s*/i, '').trim(),
   }));
 
-  // Check if signature is genuine or default dummy
   const isGenuineSignature =
     employee.employeeSignature &&
     !employee.employeeSignature.includes('M 15 40 C 30 15') &&
