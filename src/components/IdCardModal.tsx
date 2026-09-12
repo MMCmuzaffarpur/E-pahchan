@@ -41,21 +41,15 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 
   if (!isOpen || !employee) return null;
 
-  const handleDownload = async (target: 'front' | 'back' | 'both') => {
+  // Single Combined PNG Downloader (Front + Back in 1 File)
+  const handleDownloadCombined = async () => {
     setIsDownloading(true);
     try {
-      let elementToCapture: HTMLElement | null = null;
-      let filename = `ESIC_Card_${employee.insuranceNo}_${employee.name.replace(/\s+/g, '_')}`;
+      let elementToCapture: HTMLElement | null = dualContainerRef.current;
 
-      if (target === 'front' && frontCardRef.current) {
-        elementToCapture = frontCardRef.current;
-        filename += '_FRONT.png';
-      } else if (target === 'back' && backCardRef.current) {
-        elementToCapture = backCardRef.current;
-        filename += '_BACK.png';
-      } else if (dualContainerRef.current) {
-        elementToCapture = dualContainerRef.current;
-        filename += '_COMBINED.png';
+      // Agar user 3D Flip mode me ho, toh virtual element capture karein
+      if (!elementToCapture) {
+        elementToCapture = document.getElementById('combined-card-export-target');
       }
 
       if (elementToCapture) {
@@ -67,7 +61,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = image;
-        link.download = filename;
+        link.download = `ESIC_Card_${employee.insuranceNo}_${employee.name.replace(/\s+/g, '_')}_DUAL.png`;
         link.click();
       }
     } catch (err) {
@@ -176,10 +170,25 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
                   <span>{isFlipped ? 'Flip to Front Side' : 'Flip to Back Side'}</span>
                 </button>
               </div>
+
+              {/* Hidden Combined Canvas for 3D View Download */}
+              <div
+                id="combined-card-export-target"
+                className="absolute -left-[9999px] flex gap-4 p-4 bg-white"
+                style={{ width: '960px' }}
+              >
+                <div className="w-[460px] aspect-[85.6/54] rounded-xl overflow-hidden border border-slate-300">
+                  <FrontCardView employee={employee} settings={settings} />
+                </div>
+                <div className="w-[460px] aspect-[85.6/54] rounded-xl overflow-hidden border border-slate-300">
+                  <BackCardView employee={employee} settings={settings} />
+                </div>
+              </div>
             </div>
           ) : (
             <div
               ref={dualContainerRef}
+              id="combined-card-export-target"
               className="w-full flex flex-col lg:flex-row items-center justify-center gap-6 py-2"
             >
               <div className="w-full max-w-[480px] aspect-[85.6/54] rounded-xl overflow-hidden shadow-2xl border border-slate-300">
@@ -193,7 +202,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
           )}
         </div>
 
-        {/* Modal Bottom Action Bar */}
+        {/* Modal Bottom Action Bar (Updated Single Download Button) */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => onEdit(employee)}
@@ -204,22 +213,14 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Single Combined Download Button */}
             <button
-              onClick={() => handleDownload('front')}
+              onClick={handleDownloadCombined}
               disabled={isDownloading}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-2 transition-all cursor-pointer shadow"
             >
-              <Download className="w-3.5 h-3.5 text-slate-400" />
-              <span>Front Card PNG</span>
-            </button>
-
-            <button
-              onClick={() => handleDownload('back')}
-              disabled={isDownloading}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-400" />
-              <span>Back Card PNG</span>
+              <Download className="w-4 h-4 text-amber-300" />
+              <span>{isDownloading ? 'Exporting...' : 'Download Smart Card (Combined PNG)'}</span>
             </button>
 
             <button
@@ -237,7 +238,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Watermark Shifted Down + Dispensary in Footer)
+   FRONT CARD VIEW COMPONENT
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
@@ -245,7 +246,7 @@ export const FrontCardView: React.FC<{
 }> = ({ employee }) => {
   return (
     <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
-      {/* BACKGROUND WATERMARK: Moved Slightly Down to Perfect Card Center */}
+      {/* BACKGROUND WATERMARK: Centered in Card Body */}
       <div className="absolute inset-x-0 top-[56%] -translate-y-1/2 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
         <img
           src={ESIC_EMBEDDED_LOGO}
@@ -266,7 +267,7 @@ export const FrontCardView: React.FC<{
           </p>
         </div>
 
-        {/* Center: Official ESIC Logo */}
+        {/* Center Logo */}
         <div className="shrink-0 px-2 flex items-center justify-center">
           <img
             src={ESIC_EMBEDDED_LOGO}
@@ -288,7 +289,6 @@ export const FrontCardView: React.FC<{
 
       {/* 2. CARD BODY */}
       <div className="flex-1 p-3 flex gap-3 items-center relative z-10">
-        {/* Left Information */}
         <div className="flex-1 space-y-1.5 text-[9px] sm:text-[10px] text-slate-800">
           <div className="flex items-baseline">
             <span className="font-bold text-[#0b3c75] w-24 shrink-0">IP No. :</span>
@@ -333,7 +333,7 @@ export const FrontCardView: React.FC<{
           </div>
         </div>
 
-        {/* Right: Blank Photo Frame */}
+        {/* Blank Photo Frame */}
         <div className="shrink-0 flex flex-col items-center justify-center">
           <div className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded border border-slate-400 bg-white/70 shadow-inner flex flex-col items-center justify-center">
             <span className="text-[7.5px] font-semibold text-slate-400 uppercase tracking-wider text-center leading-tight">
@@ -361,7 +361,7 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Transparent Watermark + Expanded List + Blue Patti)
+   BACK CARD VIEW COMPONENT (Signatures Shifted Down to Blue Patti)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -379,7 +379,7 @@ export const BackCardView: React.FC<{
 
   return (
     <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
-      {/* BACKGROUND WATERMARK: Fully Visible (No blocking background boxes) */}
+      {/* BACKGROUND WATERMARK */}
       <div className="absolute inset-x-0 top-[52%] -translate-y-1/2 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
         <img
           src={ESIC_EMBEDDED_LOGO}
@@ -398,9 +398,9 @@ export const BackCardView: React.FC<{
         </span>
       </div>
 
-      {/* 2. BODY: Expandable Family Table, Nominee & Signatures */}
-      <div className="flex-1 px-2.5 pt-1.5 pb-0 flex flex-col justify-between text-[8px] sm:text-[8.5px] relative z-10">
-        {/* Expanded Family Table (Supports more members cleanly) */}
+      {/* 2. BODY: Expandable Family Table, Nominee & Closely Anchored Signatures */}
+      <div className="flex-1 px-2.5 pt-1.5 pb-0 flex flex-col justify-start text-[8px] sm:text-[8.5px] relative z-10">
+        {/* Family Table */}
         <div className="overflow-hidden">
           <table className="w-full border-collapse text-[7.5px] sm:text-[8px] text-slate-800 bg-transparent">
             <thead>
@@ -430,17 +430,17 @@ export const BackCardView: React.FC<{
           </table>
         </div>
 
-        {/* Nominee Info (Transparent Background - Logo Shows Behind) */}
-        <div className="flex justify-between items-center py-0.5 px-1.5 border border-slate-200/80 rounded bg-transparent text-[7.5px] sm:text-[8px]">
+        {/* Nominee Info */}
+        <div className="flex justify-between items-center py-0.5 px-1.5 border border-slate-200/80 rounded bg-transparent text-[7.5px] sm:text-[8px] mt-1">
           <span className="font-bold text-slate-700">Nominee:</span>
           <span className="text-slate-900 font-semibold truncate">
             {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
           </span>
         </div>
 
-        {/* Signatures Area */}
-        <div className="flex items-end justify-between px-4 text-[7px] bg-transparent">
-          {/* Employee Sign */}
+        {/* Signatures Area: mt-auto ensures it sits right above the Blue Patti */}
+        <div className="mt-auto flex items-end justify-between px-4 pb-0.5 text-[7px] bg-transparent">
+          {/* Employee Sign Box */}
           <div className="flex flex-col items-center w-32">
             <div className="h-7 w-full flex items-center justify-center bg-transparent">
               {isGenuineSignature ? (
@@ -461,16 +461,15 @@ export const BackCardView: React.FC<{
             </span>
           </div>
 
-          {/* Employer Sign */}
+          {/* Employer Sign Box */}
           <div className="flex flex-col items-center w-32">
-            <div className="h-7 w-full flex items-center justify-center bg-transparent">
+            <div className="h-7 w-full flex items-center justify-center bg-transparent relative">
               {settings.employerSignature ? (
                 <img
                   src={settings.employerSignature}
                   alt=""
                   className="max-h-full max-w-full object-contain mix-blend-multiply"
                   style={{
-                    filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
                     backgroundColor: 'transparent',
                   }}
                 />
@@ -482,7 +481,7 @@ export const BackCardView: React.FC<{
           </div>
         </div>
 
-        {/* Blue Patti (Band) with Employer Name Underneath Signatures */}
+        {/* Blue Patti with Employer Details */}
         <div className="bg-[#0b3c75] text-white px-2 py-0.5 flex items-center justify-between text-[7px] sm:text-[7.5px] rounded-t font-medium">
           <span className="font-bold text-blue-200">Employer:</span>
           <span className="truncate max-w-[280px] font-semibold text-white uppercase">
