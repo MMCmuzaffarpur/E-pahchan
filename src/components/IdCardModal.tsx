@@ -277,33 +277,13 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Bigger Clean Barcode - No Text Below)
+   FRONT CARD VIEW COMPONENT (No Barcode, Clean Google Lens QR Code)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
   onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }> = ({ employee, onViewProfilePDF }) => {
-  // Generate a bigger, bolder, premium authentic barcode pattern (No text below)
-  const ipStr = employee.insuranceNo || '4216832815';
-  const barcodeBars = [];
-  
-  for (let i = 0; i < 54; i++) {
-    const charCode = ipStr.charCodeAt(i % ipStr.length);
-    const isDark = (charCode + i) % 2 === 0;
-    const width = ((charCode + i) % 4 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
-    barcodeBars.push(
-      <div
-        key={i}
-        style={{
-          width,
-          height: '32px', // Taller height
-          backgroundColor: isDark ? '#000000' : '#1e293b',
-        }}
-      />
-    );
-  }
-
   const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=ESIC-IP-${employee.insuranceNo}`;
 
   return (
@@ -417,7 +397,7 @@ export const FrontCardView: React.FC<{
         }}
       >
         {/* Left Demographics Details */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '9px', color: '#000000' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '9px', color: '#000000' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
@@ -465,13 +445,6 @@ export const FrontCardView: React.FC<{
             <span style={{ fontWeight: 700, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
-          </div>
-
-          {/* BIGGER CLEAN BARCODE (NO TEXT BELOW) */}
-          <div style={{ display: 'flex', alignItems: 'center', marginTop: '3px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 2px' }}>
-              {barcodeBars}
-            </div>
           </div>
         </div>
 
@@ -560,15 +533,19 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT
+   BACK CARD VIEW COMPONENT (Cleaned Family Names Regex Filter)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee, settings }) => {
+  // Fixed regex cleaner to remove any extra prefixes from family names
   const cleanFamily = (employee.familyMembers || []).map((f) => ({
     ...f,
-    name: f.name.replace(/^r\s+/i, '').replace(/^(?:Is\s*Residing|with\s*IP)\s*/i, '').trim(),
+    name: f.name
+      .replace(/^(?:ar|ding|r|is|residing|with)\s+/i, '')
+      .replace(/^(?:Is\s*Residing|with\s*IP)\s*/i, '')
+      .trim(),
   }));
 
   const isGenuineSignature =
