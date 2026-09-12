@@ -277,15 +277,16 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Aligned Colons + Google Lens Scannable QR Code)
+   FRONT CARD VIEW COMPONENT (Proper Photo Frame & Google Lens Scannable QR)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
   onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }> = ({ employee, onViewProfilePDF }) => {
-  // Real scannable URL or Data endpoint for Google Lens
-  const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://e-Pehchan.app/profile/${employee.insuranceNo}`;
+  // Enhanced QR code endpoint with high error correction and direct profile URL mapping
+  const profileUrl = `https://e-Pehchan.app/profile/${employee.insuranceNo}`;
+  const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(profileUrl)}&ecc=H`;
 
   return (
     <div
@@ -397,7 +398,7 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details (Aligned Colons using CSS Grid) */}
+        {/* Left Demographics Details (Aligned Colons) */}
         <div
           style={{
             flex: 1,
@@ -459,13 +460,13 @@ export const FrontCardView: React.FC<{
           </span>
         </div>
 
-        {/* Right Column: Landscape Family Photo Frame + Google Lens Scannable QR Code */}
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-          {/* Family Photo Frame */}
+        {/* Right Column: Expanded Landscape Family Photo Frame + Larger Google Lens QR Code */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+          {/* Larger Landscape Family Photo Frame (Height 95px, Width 135px) */}
           <div
             style={{
               width: '135px',
-              height: '75px',
+              height: '95px',
               borderRadius: '3px',
               border: '1px solid #94a3b8',
               backgroundColor: 'rgba(255,255,255,0.75)',
@@ -491,21 +492,21 @@ export const FrontCardView: React.FC<{
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               backgroundColor: '#f8fafc',
               border: '1px solid #cbd5e1',
               borderRadius: '3px',
-              padding: '2px 4px',
+              padding: '3px 6px',
               cursor: 'pointer',
             }}
           >
             <img
               src={qrDataUrl}
               alt="Scan QR"
-              style={{ width: '30px', height: '30px', objectFit: 'contain' }}
+              style={{ width: '34px', height: '34px', objectFit: 'contain' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '6px', fontWeight: 800, color: '#0b3c75' }}>SCAN PROFILE</span>
+              <span style={{ fontSize: '6.5px', fontWeight: 800, color: '#0b3c75' }}>SCAN PROFILE</span>
               <span style={{ fontSize: '5px', color: '#475569' }}>Google Lens</span>
             </div>
           </div>
