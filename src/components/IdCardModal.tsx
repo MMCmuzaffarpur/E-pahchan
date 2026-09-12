@@ -277,14 +277,15 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (No Barcode, Clean Google Lens QR Code)
+   FRONT CARD VIEW COMPONENT (Aligned Colons + Google Lens Scannable QR Code)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
   onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }> = ({ employee, onViewProfilePDF }) => {
-  const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=ESIC-IP-${employee.insuranceNo}`;
+  // Real scannable URL or Data endpoint for Google Lens
+  const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://e-Pehchan.app/profile/${employee.insuranceNo}`;
 
   return (
     <div
@@ -396,65 +397,75 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '9px', color: '#000000' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
-              {employee.insuranceNo}
-            </span>
-          </div>
+        {/* Left Demographics Details (Aligned Colons using CSS Grid) */}
+        <div
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: '102px 8px 1fr',
+            alignItems: 'baseline',
+            rowGap: '3px',
+            fontSize: '9px',
+            color: '#000000',
+          }}
+        >
+          {/* IP No */}
+          <span style={{ fontWeight: 800, color: '#0b3c75' }}>IP No.</span>
+          <span style={{ fontWeight: 800, color: '#0b3c75', textAlign: 'center' }}>:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
+            {employee.insuranceNo}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Name :</span>
-            <span style={{ fontWeight: 900, textTransform: 'uppercase', color: '#000000' }}>
-              {employee.name}
-            </span>
-          </div>
+          {/* Name */}
+          <span style={{ fontWeight: 800, color: '#1e293b' }}>Name</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>:</span>
+          <span style={{ fontWeight: 900, textTransform: 'uppercase', color: '#000000' }}>
+            {employee.name}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>D. O. B. :</span>
-            <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
-              {employee.dob}
-            </span>
-          </div>
+          {/* DOB */}
+          <span style={{ fontWeight: 800, color: '#1e293b' }}>D. O. B.</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>:</span>
+          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
+            {employee.dob}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Father / Husband :</span>
-            <span style={{ fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
-              {employee.fatherOrHusbandName}
-            </span>
-          </div>
+          {/* Father / Husband */}
+          <span style={{ fontWeight: 800, color: '#1e293b' }}>Father / Husband</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>:</span>
+          <span style={{ fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
+            {employee.fatherOrHusbandName}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Mobile :</span>
-            <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
-              {employee.mobileNo || 'NA'}
-            </span>
-          </div>
+          {/* Mobile */}
+          <span style={{ fontWeight: 800, color: '#1e293b' }}>Mobile</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>:</span>
+          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
+            {employee.mobileNo || 'NA'}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 600, fontSize: '7.5px', lineHeight: 1.15, color: '#0f172a', maxHeight: '20px', overflow: 'hidden' }}>
-              {employee.address || `${employee.city}, ${employee.state}`}
-            </span>
-          </div>
+          {/* Perm Address */}
+          <span style={{ fontWeight: 800, color: '#1e293b', alignSelf: 'flex-start' }}>Perm. Address</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center', alignSelf: 'flex-start' }}>:</span>
+          <span style={{ fontWeight: 600, fontSize: '7.5px', lineHeight: 1.15, color: '#0f172a', maxHeight: '20px', overflow: 'hidden' }}>
+            {employee.address || `${employee.city}, ${employee.state}`}
+          </span>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Nominee :</span>
-            <span style={{ fontWeight: 700, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
-              {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
-            </span>
-          </div>
+          {/* Nominee */}
+          <span style={{ fontWeight: 800, color: '#1e293b' }}>Nominee</span>
+          <span style={{ fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>:</span>
+          <span style={{ fontWeight: 700, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
+            {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
+          </span>
         </div>
 
         {/* Right Column: Landscape Family Photo Frame + Google Lens Scannable QR Code */}
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
           {/* Family Photo Frame */}
           <div
             style={{
               width: '135px',
-              height: '80px',
+              height: '75px',
               borderRadius: '3px',
               border: '1px solid #94a3b8',
               backgroundColor: 'rgba(255,255,255,0.75)',
@@ -491,7 +502,7 @@ export const FrontCardView: React.FC<{
             <img
               src={qrDataUrl}
               alt="Scan QR"
-              style={{ width: '26px', height: '26px', objectFit: 'contain' }}
+              style={{ width: '30px', height: '30px', objectFit: 'contain' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '6px', fontWeight: 800, color: '#0b3c75' }}>SCAN PROFILE</span>
@@ -533,13 +544,12 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Cleaned Family Names Regex Filter)
+   BACK CARD VIEW COMPONENT
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee, settings }) => {
-  // Fixed regex cleaner to remove any extra prefixes from family names
   const cleanFamily = (employee.familyMembers || []).map((f) => ({
     ...f,
     name: f.name
