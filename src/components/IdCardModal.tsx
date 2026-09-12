@@ -42,7 +42,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 
   if (!isOpen || !employee) return null;
 
-  // Zero-Clipping Combined PNG Downloader
+  // 100% Reliable Combined PNG Exporter
   const handleDownloadCombined = async () => {
     setIsDownloading(true);
     try {
@@ -53,7 +53,6 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         throw new Error('Card elements not found');
       }
 
-      // Safe capture with standard RGB sanitizer to avoid oklch crashes
       const captureOptions = {
         scale: 3,
         useCORS: true,
@@ -95,7 +94,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, combinedWidth, combinedHeight);
 
-        // Draw Front and Back Cards side-by-side
+        // Draw Front & Back Cards
         ctx.drawImage(canvasFront, padding, padding);
         ctx.drawImage(canvasBack, padding + canvasFront.width + gap, padding);
 
@@ -176,15 +175,14 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Center: Cards Stage */}
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-950/60 relative min-h-[460px]">
+        {/* Modal Center: Cards Stage (Responsive Without Horizontal Overflow) */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-950/60 relative min-h-[460px]">
           {viewMode === '3d-flip' ? (
             <div className="perspective-1000 w-full flex flex-col items-center">
               <div
-                className={`relative transition-all duration-700 transform-style-3d cursor-pointer ${
+                className={`relative w-full max-w-[470px] aspect-[85.6/54] transition-all duration-700 transform-style-3d cursor-pointer ${
                   isFlipped ? 'rotate-y-180' : ''
                 }`}
-                style={{ width: '500px', height: '315px' }}
                 onClick={() => setIsFlipped(!isFlipped)}
               >
                 <div
@@ -216,19 +214,19 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6 py-2 overflow-x-auto">
+            <div className="w-full flex flex-col xl:flex-row items-center justify-center gap-5 py-2">
               <div
                 ref={dualFrontRef}
-                className="rounded-xl overflow-hidden shadow-2xl shrink-0"
-                style={{ width: '500px', height: '315px', border: '1px solid #cbd5e1' }}
+                className="w-full max-w-[465px] aspect-[85.6/54] rounded-xl overflow-hidden shadow-2xl shrink-0"
+                style={{ border: '1px solid #cbd5e1' }}
               >
                 <FrontCardView employee={employee} settings={settings} />
               </div>
 
               <div
                 ref={dualBackRef}
-                className="rounded-xl overflow-hidden shadow-2xl shrink-0"
-                style={{ width: '500px', height: '315px', border: '1px solid #cbd5e1' }}
+                className="w-full max-w-[465px] aspect-[85.6/54] rounded-xl overflow-hidden shadow-2xl shrink-0"
+                style={{ border: '1px solid #cbd5e1' }}
               >
                 <BackCardView employee={employee} settings={settings} />
               </div>
@@ -271,7 +269,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Exact Proportions - Zero Text/Logo Clipping)
+   FRONT CARD VIEW COMPONENT (Responsive - Fits Comfortably)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
@@ -280,8 +278,8 @@ export const FrontCardView: React.FC<{
   return (
     <div
       style={{
-        width: '500px',
-        height: '315px',
+        width: '100%',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -294,11 +292,12 @@ export const FrontCardView: React.FC<{
         boxSizing: 'border-box',
       }}
     >
-      {/* 1. TOP HEADER (42px Height) */}
+      {/* 1. TOP HEADER */}
       <div
         style={{
-          height: '42px',
-          padding: '4px 10px',
+          height: '14%',
+          minHeight: '38px',
+          padding: '2px 8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -319,13 +318,13 @@ export const FrontCardView: React.FC<{
           </p>
         </div>
 
-        <div style={{ flexShrink: 0, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ flexShrink: 0, padding: '0 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img
             src={ESIC_EMBEDDED_LOGO}
             alt="ESIC"
             style={{
-              width: '34px',
-              height: '34px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               objectFit: 'contain',
               backgroundColor: '#ffffff',
@@ -344,13 +343,13 @@ export const FrontCardView: React.FC<{
         </div>
       </div>
 
-      {/* BACKGROUND WATERMARK: Precisely Centered in Card Body (Will Never Cut) */}
+      {/* BACKGROUND WATERMARK: Fully Contained Inside Card Body */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          top: '44px',
+          top: '40px',
           bottom: '24px',
           display: 'flex',
           alignItems: 'center',
@@ -364,8 +363,8 @@ export const FrontCardView: React.FC<{
           src={ESIC_EMBEDDED_LOGO}
           alt=""
           style={{
-            width: '180px',
-            height: '180px',
+            width: '160px',
+            height: '160px',
             objectFit: 'contain',
             opacity: 0.14,
             filter: 'blur(0.8px)',
@@ -373,13 +372,13 @@ export const FrontCardView: React.FC<{
         />
       </div>
 
-      {/* 2. CARD BODY (249px Height - Plenty of space for 7 rows & photo) */}
+      {/* 2. CARD BODY */}
       <div
         style={{
           flex: 1,
-          padding: '8px 12px',
+          padding: '6px 10px',
           display: 'flex',
-          gap: '10px',
+          gap: '8px',
           alignItems: 'center',
           position: 'relative',
           zIndex: 10,
@@ -387,52 +386,52 @@ export const FrontCardView: React.FC<{
         }}
       >
         {/* Left Demographics Details */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: '9.5px', color: '#1e293b' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', height: '100%', fontSize: '9px', color: '#1e293b' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '12px', color: '#0b3c75' }}>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11.5px', color: '#0b3c75' }}>
               {employee.insuranceNo}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>Name :</span>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Name :</span>
             <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: '#0f172a' }}>
               {employee.name}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>D. O. B. :</span>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>D. O. B. :</span>
             <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
               {employee.dob}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>Father / Husband :</span>
-            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '175px' }}>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Father / Husband :</span>
+            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
               {employee.fatherOrHusbandName}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>Mobile :</span>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Mobile :</span>
             <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
               {employee.mobileNo || 'NA'}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 500, fontSize: '8.5px', lineHeight: 1.25, color: '#334155', maxHeight: '34px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
+            <span style={{ fontWeight: 500, fontSize: '8px', lineHeight: 1.2, color: '#334155', maxHeight: '30px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '92px', flexShrink: 0, color: '#475569' }}>Nominee :</span>
-            <span style={{ fontWeight: 600, fontSize: '8.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '175px' }}>
+            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Nominee :</span>
+            <span style={{ fontWeight: 600, fontSize: '8px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
@@ -442,8 +441,8 @@ export const FrontCardView: React.FC<{
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div
             style={{
-              width: '108px',
-              height: '130px',
+              width: '100px',
+              height: '115px',
               borderRadius: '3px',
               border: '1px solid #94a3b8',
               backgroundColor: 'rgba(255,255,255,0.75)',
@@ -462,15 +461,15 @@ export const FrontCardView: React.FC<{
         </div>
       </div>
 
-      {/* 3. FOOTER (24px Height) */}
+      {/* 3. FOOTER */}
       <div
         style={{
-          height: '24px',
-          padding: '0 10px',
+          height: '22px',
+          padding: '0 8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '7.5px',
+          fontSize: '7px',
           backgroundColor: '#f1f5f9',
           borderTop: '1px solid #e2e8f0',
           color: '#475569',
@@ -482,7 +481,7 @@ export const FrontCardView: React.FC<{
         <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
           Reg Date: {employee.registrationDate || employee.appointmentDate || '18/05/2023'}
         </span>
-        <span style={{ fontWeight: 600, color: '#334155', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '190px', padding: '0 4px' }}>
+        <span style={{ fontWeight: 600, color: '#334155', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px', padding: '0 4px' }}>
           Disp: {employee.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)'}
         </span>
         <span style={{ fontWeight: 'bold', color: '#0b3c75', whiteSpace: 'nowrap' }}>
@@ -494,7 +493,7 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Exact Proportions - Zero Clipping)
+   BACK CARD VIEW COMPONENT (Responsive - Fits Comfortably)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -513,8 +512,8 @@ export const BackCardView: React.FC<{
   return (
     <div
       style={{
-        width: '500px',
-        height: '315px',
+        width: '100%',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -527,11 +526,12 @@ export const BackCardView: React.FC<{
         boxSizing: 'border-box',
       }}
     >
-      {/* 1. TOP HEADER (42px Height) */}
+      {/* 1. TOP HEADER */}
       <div
         style={{
-          height: '42px',
-          padding: '4px 10px',
+          height: '14%',
+          minHeight: '38px',
+          padding: '2px 8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -543,21 +543,21 @@ export const BackCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        <span style={{ fontSize: '9px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+        <span style={{ fontSize: '8.5px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
           PARIVARIK VIVARAN / FAMILY DETAILS
         </span>
-        <span style={{ fontSize: '7.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
+        <span style={{ fontSize: '7px', fontFamily: 'monospace', color: '#bfdbfe' }}>
           Toll Free: 1800-11-2526
         </span>
       </div>
 
-      {/* BACKGROUND WATERMARK: Centered in Card Body (Will Never Cut) */}
+      {/* BACKGROUND WATERMARK */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          top: '44px',
+          top: '40px',
           bottom: '24px',
           display: 'flex',
           alignItems: 'center',
@@ -571,8 +571,8 @@ export const BackCardView: React.FC<{
           src={ESIC_EMBEDDED_LOGO}
           alt=""
           style={{
-            width: '180px',
-            height: '180px',
+            width: '160px',
+            height: '160px',
             objectFit: 'contain',
             opacity: 0.14,
             filter: 'blur(0.8px)',
@@ -580,11 +580,11 @@ export const BackCardView: React.FC<{
         />
       </div>
 
-      {/* 2. BODY (249px Height) */}
+      {/* 2. BODY */}
       <div
         style={{
           flex: 1,
-          padding: '6px 10px 0 10px',
+          padding: '5px 8px 0 8px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -595,26 +595,26 @@ export const BackCardView: React.FC<{
       >
         {/* Family Table */}
         <div style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8px', color: '#1e293b' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5px', color: '#1e293b' }}>
             <thead>
               <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '1px solid #cbd5e1' }}>
-                <th style={{ padding: '3px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Family Member</th>
-                <th style={{ padding: '3px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Relationship</th>
-                <th style={{ padding: '3px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontFamily: 'monospace' }}>DOB</th>
+                <th style={{ padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Family Member</th>
+                <th style={{ padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Relationship</th>
+                <th style={{ padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontFamily: 'monospace' }}>DOB</th>
               </tr>
             </thead>
             <tbody>
               {cleanFamily.length > 0 ? (
-                cleanFamily.slice(0, 6).map((f, i) => (
+                cleanFamily.slice(0, 5).map((f, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '2.5px 6px', fontWeight: 600, color: '#0f172a' }}>{f.name}</td>
-                    <td style={{ padding: '2.5px 6px', color: '#475569' }}>{f.relation}</td>
-                    <td style={{ padding: '2.5px 6px', fontFamily: 'monospace', color: '#334155' }}>{f.dob || 'NA'}</td>
+                    <td style={{ padding: '2px 4px', fontWeight: 600, color: '#0f172a' }}>{f.name}</td>
+                    <td style={{ padding: '2px 4px', color: '#475569' }}>{f.relation}</td>
+                    <td style={{ padding: '2px 4px', fontFamily: 'monospace', color: '#334155' }}>{f.dob || 'NA'}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} style={{ padding: '6px', textAlign: 'center', fontStyle: 'italic', color: '#94a3b8' }}>
+                  <td colSpan={3} style={{ padding: '4px', textAlign: 'center', fontStyle: 'italic', color: '#94a3b8' }}>
                     No family member data registered
                   </td>
                 </tr>
@@ -624,10 +624,10 @@ export const BackCardView: React.FC<{
         </div>
 
         {/* Signatures Area: Anchored directly right above Blue Patti */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 16px 2px 16px', fontSize: '7px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 12px 2px 12px', fontSize: '7px' }}>
           {/* Employee Sign Box */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px' }}>
-            <div style={{ height: '30px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
+            <div style={{ height: '26px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isGenuineSignature ? (
                 <img
                   src={employee.employeeSignature}
@@ -650,8 +650,8 @@ export const BackCardView: React.FC<{
           </div>
 
           {/* Employer Sign Box */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px' }}>
-            <div style={{ height: '30px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
+            <div style={{ height: '26px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {settings.employerSignature ? (
                 <img
                   src={settings.employerSignature}
@@ -671,15 +671,15 @@ export const BackCardView: React.FC<{
           </div>
         </div>
 
-        {/* Blue Patti with Employer Details (Never cut vertically) */}
+        {/* Blue Patti with Employer Details */}
         <div
           style={{
-            height: '20px',
-            padding: '0 8px',
+            height: '18px',
+            padding: '0 6px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            fontSize: '7.5px',
+            fontSize: '7px',
             backgroundColor: '#0b3c75',
             color: '#ffffff',
             borderTopLeftRadius: '3px',
@@ -688,7 +688,7 @@ export const BackCardView: React.FC<{
           }}
         >
           <span style={{ fontWeight: 'bold', color: '#bfdbfe' }}>Employer:</span>
-          <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '280px' }}>
+          <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>
             {employee.employerName}
           </span>
           <span style={{ fontSize: '6.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
@@ -697,11 +697,11 @@ export const BackCardView: React.FC<{
         </div>
       </div>
 
-      {/* 3. FOOTER (24px Height) */}
+      {/* 3. FOOTER */}
       <div
         style={{
-          height: '24px',
-          padding: '0 10px',
+          height: '22px',
+          padding: '0 8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
