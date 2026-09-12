@@ -1,2 +1,4 @@
-// Official Wikimedia ESIC SVG Logo (Zero Bundle Size & No Base64 Mess)
-export const ESIC_EMBEDDED_LOGO = "https://upload.wikimedia.org/wikipedia/commons/4/4e/ESIC_Logo.svg";
+// Root assets folder se logo.png ko Vite ke zariye import karein
+import localEsicLogo from '../../../assets/logo.png';
+
+export const ESIC_EMBEDDED_LOGO = localEsicLogo;
