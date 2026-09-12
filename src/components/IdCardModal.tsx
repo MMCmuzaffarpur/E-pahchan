@@ -42,7 +42,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 
   if (!isOpen || !employee) return null;
 
-  // 100% Reliable Combined PNG Downloader (Zero OKLCH crash)
+  // 100% Zero-OKLCH-Crash Combined PNG Exporter
   const handleDownloadCombined = async () => {
     setIsDownloading(true);
     try {
@@ -53,25 +53,41 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         throw new Error('Card elements not found');
       }
 
-      // Render Front Canvas
-      const canvasFront = await html2canvas(frontEl, {
+      // Safe capture function converting any modern oklch/lab colors to pure rgb
+      const captureOptions = {
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-      });
+        onclone: (clonedDoc: Document) => {
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            if (htmlEl.style) {
+              const comp = window.getComputedStyle(htmlEl);
+              // Force standard RGB values if any property contains oklch
+              if (comp.color && comp.color.includes('oklch')) {
+                htmlEl.style.color = '#1e293b';
+              }
+              if (comp.backgroundColor && comp.backgroundColor.includes('oklch')) {
+                htmlEl.style.backgroundColor = '#ffffff';
+              }
+              if (comp.borderColor && comp.borderColor.includes('oklch')) {
+                htmlEl.style.borderColor = '#cbd5e1';
+              }
+            }
+          });
+        },
+      };
 
-      // Render Back Canvas
-      const canvasBack = await html2canvas(backEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
+      // 1. Render Front Canvas
+      const canvasFront = await html2canvas(frontEl, captureOptions);
 
-      // Stitch both side-by-side
+      // 2. Render Back Canvas
+      const canvasBack = await html2canvas(backEl, captureOptions);
+
+      // 3. Combine both into a single high-res canvas
       const gap = 30;
       const padding = 25;
       const combinedWidth = canvasFront.width + canvasBack.width + gap + padding * 2;
@@ -90,7 +106,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         ctx.drawImage(canvasFront, padding, padding);
         ctx.drawImage(canvasBack, padding + canvasFront.width + gap, padding);
 
-        // Export as High-Res PNG
+        // Trigger Instant PNG Download
         const imageUri = combinedCanvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
         downloadLink.href = imageUri;
@@ -101,7 +117,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
       }
     } catch (err: any) {
       console.error('Download error:', err);
-      alert('Download failed: ' + (err.message || 'Unknown error'));
+      alert('Download error: ' + (err.message || 'Check browser console'));
     } finally {
       setIsDownloading(false);
     }
@@ -265,7 +281,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Pure Hex Colors - 100% OKLCH-Free)
+   FRONT CARD VIEW COMPONENT (Pure Hex Styles - OKLCH Proof)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
@@ -273,144 +289,195 @@ export const FrontCardView: React.FC<{
 }> = ({ employee }) => {
   return (
     <div
-      className="w-full h-full flex flex-col justify-between select-none relative overflow-hidden font-sans"
-      style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        userSelect: 'none',
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: 'Arial, sans-serif',
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+      }}
     >
       {/* BACKGROUND WATERMARK */}
       <div
-        className="absolute inset-x-0 pointer-events-none overflow-hidden flex items-center justify-center"
-        style={{ top: '56%', transform: 'translateY(-50%)', zIndex: 0 }}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '56%',
+          transform: 'translateY(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: 0,
+        }}
       >
         <img
           src={ESIC_EMBEDDED_LOGO}
           alt=""
-          className="w-40 h-40 object-contain select-none"
-          style={{ opacity: 0.15, filter: 'blur(0.8px)' }}
+          style={{
+            width: '160px',
+            height: '160px',
+            objectFit: 'contain',
+            opacity: 0.15,
+            filter: 'blur(0.8px)',
+          }}
         />
       </div>
 
       {/* 1. TOP HEADER */}
       <div
-        className="px-3 py-2 flex items-center justify-between relative"
         style={{
+          padding: '6px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'relative',
           backgroundColor: '#0b3c75',
           color: '#ffffff',
           borderBottom: '2.5px solid #00b4d8',
           zIndex: 10,
         }}
       >
-        <div className="flex-1 text-left">
-          <p className="text-[9px] sm:text-[10px] font-bold leading-tight" style={{ color: '#ffffff' }}>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <p style={{ fontSize: '9.5px', fontWeight: 'bold', lineHeight: 1.15, color: '#ffffff', margin: 0 }}>
             कर्मचारी राज्य बीमा निगम
           </p>
-          <p className="text-[6.5px] sm:text-[7px] leading-tight mt-0.5" style={{ color: '#bfdbfe' }}>
+          <p style={{ fontSize: '6.5px', lineHeight: 1.15, marginTop: '2px', color: '#bfdbfe', margin: 0 }}>
             पंचदीप भवन, सी.आई.जी. मार्ग, नई दिल्ली-110 002
           </p>
         </div>
 
-        <div className="shrink-0 px-2 flex items-center justify-center">
+        <div style={{ flexShrink: 0, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img
             src={ESIC_EMBEDDED_LOGO}
-            alt="ESIC Emblem"
-            className="w-10 h-10 rounded-full shadow-md object-contain p-0.5"
-            style={{ backgroundColor: '#ffffff' }}
+            alt="ESIC"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              objectFit: 'contain',
+              backgroundColor: '#ffffff',
+              padding: '2px',
+            }}
           />
         </div>
 
-        <div className="flex-1 text-right">
-          <p className="text-[8.5px] sm:text-[9.5px] font-bold leading-tight" style={{ color: '#ffffff' }}>
+        <div style={{ flex: 1, textAlign: 'right' }}>
+          <p style={{ fontSize: '9px', fontWeight: 'bold', lineHeight: 1.15, color: '#ffffff', margin: 0 }}>
             Employees' State Insurance Corporation
           </p>
-          <p className="text-[6.5px] sm:text-[7px] leading-tight mt-0.5" style={{ color: '#bfdbfe' }}>
+          <p style={{ fontSize: '6.5px', lineHeight: 1.15, marginTop: '2px', color: '#bfdbfe', margin: 0 }}>
             Panchdeep Bhawan, C.I.G. Marg, New Delhi-110 002
           </p>
         </div>
       </div>
 
       {/* 2. CARD BODY */}
-      <div className="flex-1 p-3 flex gap-3 items-center relative" style={{ zIndex: 10 }}>
-        <div className="flex-1 space-y-1.5 text-[9px] sm:text-[10px]" style={{ color: '#1e293b' }}>
-          <div className="flex items-baseline">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#0b3c75' }}>IP No. :</span>
-            <span className="font-mono font-black text-[12px] sm:text-[13px] tracking-wide" style={{ color: '#0b3c75' }}>
+      <div style={{ flex: 1, padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'center', position: 'relative', zIndex: 10 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9.5px', color: '#1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '12px', color: '#0b3c75' }}>
               {employee.insuranceNo}
             </span>
           </div>
 
-          <div className="flex items-baseline">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>Name :</span>
-            <span className="font-bold uppercase" style={{ color: '#0f172a' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>Name :</span>
+            <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: '#0f172a' }}>
               {employee.name}
             </span>
           </div>
 
-          <div className="flex items-baseline">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>D. O. B. :</span>
-            <span className="font-semibold font-mono" style={{ color: '#1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>D. O. B. :</span>
+            <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
               {employee.dob}
             </span>
           </div>
 
-          <div className="flex items-baseline">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>Father / Husband :</span>
-            <span className="font-semibold uppercase truncate max-w-[170px]" style={{ color: '#1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>Father / Husband :</span>
+            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
               {employee.fatherOrHusbandName}
             </span>
           </div>
 
-          <div className="flex items-baseline">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>Mobile :</span>
-            <span className="font-semibold font-mono" style={{ color: '#1e293b' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>Mobile :</span>
+            <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
               {employee.mobileNo || 'NA'}
             </span>
           </div>
 
-          <div className="flex items-start">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>Perm. Address :</span>
-            <span className="font-medium text-[8.5px] sm:text-[9px] leading-tight line-clamp-2" style={{ color: '#334155' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
+            <span style={{ fontWeight: 500, fontSize: '8.5px', lineHeight: 1.2, color: '#334155' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
 
-          <div className="flex items-baseline pt-0.5">
-            <span className="font-bold w-24 shrink-0" style={{ color: '#475569' }}>Nominee :</span>
-            <span className="font-semibold text-[8.5px] sm:text-[9px] truncate max-w-[170px]" style={{ color: '#0f172a' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', paddingTop: '2px' }}>
+            <span style={{ fontWeight: 'bold', width: '90px', flexShrink: 0, color: '#475569' }}>Nominee :</span>
+            <span style={{ fontWeight: 600, fontSize: '8.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
         </div>
 
         {/* Blank Photo Frame */}
-        <div className="shrink-0 flex flex-col items-center justify-center">
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div
-            className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded shadow-inner flex flex-col items-center justify-center"
-            style={{ border: '1px solid #94a3b8', backgroundColor: 'rgba(255,255,255,0.7)' }}
+            style={{
+              width: '105px',
+              height: '88px',
+              borderRadius: '3px',
+              border: '1px solid #94a3b8',
+              backgroundColor: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <span className="text-[7.5px] font-semibold uppercase tracking-wider text-center leading-tight" style={{ color: '#64748b' }}>
+            <span style={{ fontSize: '7.5px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center', lineHeight: 1.25, color: '#64748b' }}>
               AFFIX FAMILY<br />PHOTOGRAPH HERE
             </span>
           </div>
-          <span className="text-[7px] font-medium mt-1" style={{ color: '#64748b' }}>Family Photo</span>
+          <span style={{ fontSize: '7px', fontWeight: 500, marginTop: '3px', color: '#64748b' }}>Family Photo</span>
         </div>
       </div>
 
       {/* 3. FOOTER */}
       <div
-        className="px-2.5 py-1 flex items-center justify-between text-[7px] sm:text-[7.5px] relative"
         style={{
+          padding: '3px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '7.5px',
           backgroundColor: '#f1f5f9',
           borderTop: '1px solid #e2e8f0',
           color: '#475569',
+          position: 'relative',
           zIndex: 10,
         }}
       >
-        <span className="font-medium whitespace-nowrap">
+        <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
           Reg Date: {employee.registrationDate || employee.appointmentDate || '18/05/2023'}
         </span>
-        <span className="font-semibold truncate max-w-[180px] sm:max-w-[210px] px-1 text-center" style={{ color: '#334155' }}>
+        <span style={{ fontWeight: 600, color: '#334155', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px', padding: '0 4px' }}>
           Disp: {employee.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)'}
         </span>
-        <span className="font-semibold whitespace-nowrap" style={{ color: '#0b3c75' }}>
+        <span style={{ fontWeight: 'bold', color: '#0b3c75', whiteSpace: 'nowrap' }}>
           सामाजिक सुरक्षा / SOCIAL SECURITY
         </span>
       </div>
@@ -419,7 +486,7 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Pure Hex Colors - 100% OKLCH-Free)
+   BACK CARD VIEW COMPONENT (Pure Hex Styles - OKLCH Proof)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -437,64 +504,95 @@ export const BackCardView: React.FC<{
 
   return (
     <div
-      className="w-full h-full flex flex-col justify-between select-none relative overflow-hidden font-sans"
-      style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        userSelect: 'none',
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: 'Arial, sans-serif',
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+      }}
     >
       {/* BACKGROUND WATERMARK */}
       <div
-        className="absolute inset-x-0 pointer-events-none overflow-hidden flex items-center justify-center"
-        style={{ top: '52%', transform: 'translateY(-50%)', zIndex: 0 }}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '52%',
+          transform: 'translateY(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: 0,
+        }}
       >
         <img
           src={ESIC_EMBEDDED_LOGO}
           alt=""
-          className="w-40 h-40 object-contain select-none"
-          style={{ opacity: 0.15, filter: 'blur(0.8px)' }}
+          style={{
+            width: '160px',
+            height: '160px',
+            objectFit: 'contain',
+            opacity: 0.15,
+            filter: 'blur(0.8px)',
+          }}
         />
       </div>
 
       {/* 1. TOP HEADER */}
       <div
-        className="px-3 py-1.5 flex items-center justify-between relative"
         style={{
+          padding: '5px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'relative',
           backgroundColor: '#0b3c75',
           color: '#ffffff',
           borderBottom: '1.5px solid #00b4d8',
           zIndex: 10,
         }}
       >
-        <span className="text-[9px] font-bold tracking-wide">
+        <span style={{ fontSize: '9px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
           PARIVARIK VIVARAN / FAMILY DETAILS
         </span>
-        <span className="text-[7.5px] font-mono" style={{ color: '#bfdbfe' }}>
+        <span style={{ fontSize: '7.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
           Toll Free: 1800-11-2526
         </span>
       </div>
 
       {/* 2. BODY */}
-      <div className="flex-1 px-2.5 pt-1.5 pb-0 flex flex-col justify-between text-[8px] sm:text-[8.5px] relative" style={{ zIndex: 10 }}>
+      <div style={{ flex: 1, padding: '6px 10px 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative', zIndex: 10 }}>
         {/* Family Table */}
-        <div className="overflow-hidden">
-          <table className="w-full border-collapse text-[7.5px] sm:text-[8px]" style={{ color: '#1e293b' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8px', color: '#1e293b' }}>
             <thead>
-              <tr style={{ backgroundColor: 'rgba(226, 232, 240, 0.85)', borderBottom: '1px solid #cbd5e1' }}>
-                <th className="py-0.5 px-1.5 text-left font-bold" style={{ color: '#0f172a' }}>Family Member</th>
-                <th className="py-0.5 px-1.5 text-left font-bold" style={{ color: '#0f172a' }}>Relationship</th>
-                <th className="py-0.5 px-1.5 text-left font-mono font-bold" style={{ color: '#0f172a' }}>DOB</th>
+              <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '1px solid #cbd5e1' }}>
+                <th style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Family Member</th>
+                <th style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>Relationship</th>
+                <th style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontFamily: 'monospace' }}>DOB</th>
               </tr>
             </thead>
             <tbody>
               {cleanFamily.length > 0 ? (
                 cleanFamily.slice(0, 6).map((f, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.6)' }}>
-                    <td className="py-0.5 px-1.5 font-semibold" style={{ color: '#0f172a' }}>{f.name}</td>
-                    <td className="py-0.5 px-1.5" style={{ color: '#475569' }}>{f.relation}</td>
-                    <td className="py-0.5 px-1.5 font-mono" style={{ color: '#334155' }}>{f.dob || 'NA'}</td>
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '2px 6px', fontWeight: 600, color: '#0f172a' }}>{f.name}</td>
+                    <td style={{ padding: '2px 6px', color: '#475569' }}>{f.relation}</td>
+                    <td style={{ padding: '2px 6px', fontFamily: 'monospace', color: '#334155' }}>{f.dob || 'NA'}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="py-1 px-1.5 text-center italic" style={{ color: '#94a3b8' }}>
+                  <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'center', fontStyle: 'italic', color: '#94a3b8' }}>
                     No family member data registered
                   </td>
                 </tr>
@@ -503,61 +601,73 @@ export const BackCardView: React.FC<{
           </table>
         </div>
 
-        {/* Signatures Area */}
-        <div className="mt-auto flex items-end justify-between px-4 pb-0.5 text-[7px]" style={{ backgroundColor: 'transparent' }}>
-          {/* Employee Sign */}
-          <div className="flex flex-col items-center w-32">
-            <div className="h-7 w-full flex items-center justify-center" style={{ backgroundColor: 'transparent' }}>
+        {/* Signatures Area: Anchored directly above Blue Patti */}
+        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 16px 3px 16px', fontSize: '7px' }}>
+          {/* Employee Sign Box */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px' }}>
+            <div style={{ height: '28px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isGenuineSignature ? (
                 <img
                   src={employee.employeeSignature}
                   alt=""
-                  className="max-h-full max-w-full object-contain"
                   style={{
+                    maxHeight: '100%',
+                    maxWidth: '100%',
+                    objectFit: 'contain',
                     mixBlendMode: 'multiply',
                     filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
                   }}
                 />
               ) : (
-                <span className="text-[7.5px] italic" style={{ color: '#94a3b8' }}>Sign / LTI</span>
+                <span style={{ fontSize: '7.5px', fontStyle: 'italic', color: '#94a3b8' }}>Sign / LTI</span>
               )}
             </div>
-            <span className="font-medium text-[7.5px]" style={{ color: '#334155' }}>
+            <span style={{ fontWeight: 500, color: '#334155' }}>
               Employee Sign / LTI
             </span>
           </div>
 
-          {/* Employer Sign */}
-          <div className="flex flex-col items-center w-32">
-            <div className="h-7 w-full flex items-center justify-center relative" style={{ backgroundColor: 'transparent' }}>
+          {/* Employer Sign Box */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px' }}>
+            <div style={{ height: '28px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {settings.employerSignature ? (
                 <img
                   src={settings.employerSignature}
                   alt=""
-                  className="max-h-full max-w-full object-contain"
                   style={{
+                    maxHeight: '100%',
+                    maxWidth: '100%',
+                    objectFit: 'contain',
                     mixBlendMode: 'multiply',
-                    backgroundColor: 'transparent',
                   }}
                 />
               ) : null}
             </div>
-            <span className="font-semibold text-[7.5px]" style={{ color: '#334155' }}>
+            <span style={{ fontWeight: 'bold', color: '#334155' }}>
               Auth. Signatory (ESIC)
             </span>
           </div>
         </div>
 
-        {/* Blue Patti */}
+        {/* Blue Patti with Employer Details */}
         <div
-          className="px-2 py-0.5 flex items-center justify-between text-[7px] sm:text-[7.5px] rounded-t font-medium"
-          style={{ backgroundColor: '#0b3c75', color: '#ffffff' }}
+          style={{
+            padding: '3px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '7.5px',
+            backgroundColor: '#0b3c75',
+            color: '#ffffff',
+            borderTopLeftRadius: '3px',
+            borderTopRightRadius: '3px',
+          }}
         >
-          <span className="font-bold" style={{ color: '#bfdbfe' }}>Employer:</span>
-          <span className="truncate max-w-[280px] font-semibold uppercase" style={{ color: '#ffffff' }}>
+          <span style={{ fontWeight: 'bold', color: '#bfdbfe' }}>Employer:</span>
+          <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '270px' }}>
             {employee.employerName}
           </span>
-          <span className="text-[6.5px] font-mono" style={{ color: '#bfdbfe' }}>
+          <span style={{ fontSize: '6.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
             {employee.employerCode || '42001884020000908'}
           </span>
         </div>
@@ -565,11 +675,16 @@ export const BackCardView: React.FC<{
 
       {/* 3. FOOTER */}
       <div
-        className="px-3 py-0.5 flex items-center justify-between text-[7px] relative"
         style={{
+          padding: '2px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '7px',
           backgroundColor: '#f1f5f9',
           borderTop: '1px solid #e2e8f0',
           color: '#64748b',
+          position: 'relative',
           zIndex: 10,
         }}
       >
