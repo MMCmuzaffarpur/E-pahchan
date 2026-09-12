@@ -262,32 +262,34 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Larger Single-Color Barcode & Dark Bold Text)
+   FRONT CARD VIEW COMPONENT (Includes GS1 Style Barcode)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee }) => {
-  // Generate a unique authentic barcode line pattern based on IP No
+  // Generate authentic vertical barcode stripes
   const ipStr = employee.insuranceNo || '4216832815';
-  const barcodeLines = [];
+  const barcodeBars = [];
   
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < 48; i++) {
     const charCode = ipStr.charCodeAt(i % ipStr.length);
-    // Alternate solid black and dark gray bars for real barcode look
     const isDark = (charCode + i) % 2 === 0;
-    const width = ((charCode + i) % 3 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
-    barcodeLines.push(
+    const width = ((charCode + i) % 4 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
+    barcodeBars.push(
       <div
         key={i}
         style={{
           width,
           height: '24px',
-          backgroundColor: isDark ? '#000000' : '#334155',
+          backgroundColor: isDark ? '#000000' : '#1e293b',
         }}
       />
     );
   }
+
+  // Generate GS1 style unique numeric string underneath
+  const formattedBarcodeText = `(01) ${employee.insuranceNo.slice(0, 10)} (17) 261231 (10) ESIC01`;
 
   return (
     <div
@@ -390,7 +392,7 @@ export const FrontCardView: React.FC<{
       <div
         style={{
           flex: 1,
-          padding: '7px 12px',
+          padding: '6px 12px',
           display: 'flex',
           gap: '10px',
           alignItems: 'center',
@@ -399,11 +401,11 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details (Dark, Bold, High Contrast Text) */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '9px', color: '#000000' }}>
+        {/* Left Demographics Details + GS1 Barcode */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2.5px', fontSize: '9px', color: '#000000' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11.5px', color: '#0b3c75' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
               {employee.insuranceNo}
             </span>
           </div>
@@ -438,23 +440,26 @@ export const FrontCardView: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 600, fontSize: '8px', lineHeight: 1.2, color: '#0f172a', maxHeight: '24px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 600, fontSize: '7.5px', lineHeight: 1.15, color: '#0f172a', maxHeight: '22px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Nominee :</span>
-            <span style={{ fontWeight: 700, fontSize: '8px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
+            <span style={{ fontWeight: 700, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
 
-          {/* LARGER SINGLE-COLOR AUTHENTIC BARCODE BELOW NOMINEE */}
-          <div style={{ display: 'flex', alignItems: 'center', marginTop: '1px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 3px', border: '1px solid #94a3b8', borderRadius: '2px' }}>
-              {barcodeLines}
+          {/* AUTHENTIC GS1 BARCODE BELOW NOMINEE */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: '1px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 3px' }}>
+              {barcodeBars}
             </div>
+            <span style={{ fontSize: '6.5px', fontFamily: 'monospace', fontWeight: 700, color: '#1e293b', letterSpacing: '0.2px', marginTop: '-1px' }}>
+              {formattedBarcodeText}
+            </span>
           </div>
         </div>
 
