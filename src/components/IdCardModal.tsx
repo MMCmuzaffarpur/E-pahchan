@@ -65,7 +65,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
             const htmlEl = el as HTMLElement;
             if (htmlEl.style) {
               const comp = window.getComputedStyle(htmlEl);
-              if (comp.color && comp.color.includes('oklch')) htmlEl.style.color = '#1e293b';
+              if (comp.color && comp.color.includes('oklch')) htmlEl.style.color = '#0f172a';
               if (comp.backgroundColor && comp.backgroundColor.includes('oklch')) htmlEl.style.backgroundColor = '#ffffff';
               if (comp.borderColor && comp.borderColor.includes('oklch')) htmlEl.style.borderColor = '#cbd5e1';
             }
@@ -262,22 +262,31 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Includes Unique Color Barcode below Nominee)
+   FRONT CARD VIEW COMPONENT (Larger Single-Color Barcode & Dark Bold Text)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee }) => {
-  // Generate a pseudo-random unique pattern based on IP No for the Color Barcode
+  // Generate a unique authentic barcode line pattern based on IP No
   const ipStr = employee.insuranceNo || '4216832815';
-  const colorBars = [];
-  const palette = ['#0b3c75', '#00b4d8', '#d97706', '#1e293b', '#16a34a', '#dc2626', '#7c3aed'];
+  const barcodeLines = [];
   
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 42; i++) {
     const charCode = ipStr.charCodeAt(i % ipStr.length);
-    const color = palette[(charCode + i) % palette.length];
-    const width = (i % 3 === 0) ? '3px' : (i % 2 === 0 ? '2px' : '1.5px');
-    colorBars.push(<div key={i} style={{ width, height: '18px', backgroundColor: color }} />);
+    // Alternate solid black and dark gray bars for real barcode look
+    const isDark = (charCode + i) % 2 === 0;
+    const width = ((charCode + i) % 3 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
+    barcodeLines.push(
+      <div
+        key={i}
+        style={{
+          width,
+          height: '24px',
+          backgroundColor: isDark ? '#000000' : '#334155',
+        }}
+      />
+    );
   }
 
   return (
@@ -293,7 +302,7 @@ export const FrontCardView: React.FC<{
         overflow: 'hidden',
         fontFamily: 'Arial, sans-serif',
         backgroundColor: '#ffffff',
-        color: '#0f172a',
+        color: '#000000',
         boxSizing: 'border-box',
       }}
     >
@@ -390,65 +399,62 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details + Color Barcode */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3.5px', fontSize: '8.5px', color: '#1e293b' }}>
+        {/* Left Demographics Details (Dark, Bold, High Contrast Text) */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '9px', color: '#000000' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11.5px', color: '#0b3c75' }}>
               {employee.insuranceNo}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Name :</span>
-            <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: '#0f172a' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Name :</span>
+            <span style={{ fontWeight: 900, textTransform: 'uppercase', color: '#000000' }}>
               {employee.name}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>D. O. B. :</span>
-            <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>D. O. B. :</span>
+            <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
               {employee.dob}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Father / Husband :</span>
-            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Father / Husband :</span>
+            <span style={{ fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
               {employee.fatherOrHusbandName}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Mobile :</span>
-            <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e293b' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Mobile :</span>
+            <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
               {employee.mobileNo || 'NA'}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 500, fontSize: '7.5px', lineHeight: 1.2, color: '#334155', maxHeight: '24px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Perm. Address :</span>
+            <span style={{ fontWeight: 600, fontSize: '8px', lineHeight: 1.2, color: '#0f172a', maxHeight: '24px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Nominee :</span>
-            <span style={{ fontWeight: 600, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+            <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Nominee :</span>
+            <span style={{ fontWeight: 700, fontSize: '8px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '155px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
 
-          {/* UNIQUE COLOR BARCODE BELOW NOMINEE */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#f8fafc', padding: '1px 3px', border: '1px solid #cbd5e1', borderRadius: '2px' }}>
-              {colorBars}
+          {/* LARGER SINGLE-COLOR AUTHENTIC BARCODE BELOW NOMINEE */}
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: '1px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 3px', border: '1px solid #94a3b8', borderRadius: '2px' }}>
+              {barcodeLines}
             </div>
-            <span style={{ fontSize: '6px', fontFamily: 'monospace', fontWeight: 'bold', color: '#475569' }}>
-              *ESIC-{employee.insuranceNo}*
-            </span>
           </div>
         </div>
 
