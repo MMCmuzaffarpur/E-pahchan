@@ -7,17 +7,53 @@ import {
   DEFAULT_FAMILY_PHOTO,
 } from './defaultAssets';
 
-// Setup pdf.js worker for client-side fallback
+// Setup pdf.js worker dynamically matching installed version
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '3.11.174'}/build/pdf.worker.min.js`;
+  } catch (e) {
+    console.warn('Worker configuration notice:', e);
+  }
 }
 
 /**
  * Extract raw text from PDF file.
- * Prioritizes server-side /api/extract-pdf and falls back to client-side pdfjs-dist.
+ * Prioritizes client-side extraction with local worker and server-side fallback.
  */
 export async function extractTextFromPdf(file: File): Promise<string> {
-  // 1. Primary: Server-side extraction
+  // 1. Primary: Direct Client-Side PDF.js Extraction
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+
+      const items = textContent.items
+        .map((item: any) => item.str || '')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0);
+
+      fullText += `\n--- PAGE ${i} ---\n` + items.join('\n') + '\n';
+    }
+
+    if (fullText.trim().length > 15) {
+      return fullText;
+    }
+  } catch (clientErr) {
+    console.warn('Client PDF.js extraction attempt failed, trying server API:', clientErr);
+  }
+
+  // 2. Secondary: Server-side fallback (/api/extract-pdf)
   try {
     const base64Data = await fileToBase64(file);
     const res = await fetch('/api/extract-pdf', {
@@ -33,35 +69,26 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       }
     }
   } catch (serverErr) {
-    console.warn('Server PDF extraction failed, using client-side fallback:', serverErr);
+    console.warn('Server fallback also unavailable:', serverErr);
   }
 
-  // 2. Secondary: Client-side pdfjsLib extraction
+  // 3. Tertiary: Binary Stream Extraction
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const items = textContent.items
-        .map((item: any) => item.str || '')
-        .map((s: string) => s.trim())
-        .filter((s: string) => s.length > 0);
-
-      fullText += `\n--- PAGE ${i} ---\n` + items.join('\n') + '\n';
+    const decoder = new TextDecoder('latin1');
+    const rawPdf = decoder.decode(arrayBuffer);
+    const matches = rawPdf.match(/\(([^()]+)\)[\s]*T[jJ]/g);
+    if (matches && matches.length > 10) {
+      const extracted = matches
+        .map((m) => m.replace(/^[\s(]+|[)Tj\s]+$/g, ''))
+        .join(' ');
+      if (extracted.length > 40) return extracted;
     }
-
-    if (fullText.trim().length > 15) {
-      return fullText;
-    }
-  } catch (clientErr) {
-    console.warn('Client PDF.js extraction failed:', clientErr);
+  } catch (binErr) {
+    console.error('Binary stream extraction failed:', binErr);
   }
 
-  throw new Error('PDF text could not be extracted automatically. Please check the file.');
+  throw new Error('PDF read nahi ho saki. Kripya valid ESIC e-Pehchan PDF upload karein.');
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -73,6 +100,9 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/**
+ * Validates whether a given string is a genuine 10-digit ESIC IP Number
+ */
 export function isValidIpNumber(ip: string | undefined | null): boolean {
   if (!ip) return false;
   const digits = String(ip).replace(/\D/g, '');
@@ -83,13 +113,14 @@ export function isValidIpNumber(ip: string | undefined | null): boolean {
 }
 
 /**
- * Robust ESIC e-Pehchan Transcript Parser
+ * Master ESIC e-Pehchan Transcript Parser
+ * Supports both Sequential Columnar PDFs and Linear Text Layouts
  */
 export function parsePdfTranscript(rawText: string, fileName: string = ''): ParsedPdfResult {
   const lines = rawText
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0 && l !== ':');
 
   const cleanText = rawText.replace(/\s+/g, ' ');
 
@@ -103,13 +134,14 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
   let fatherOrHusbandName = '';
   let presentAddress = '';
   let permanentAddress = '';
-  let employerCode = '';
+  let employerCode = '42001884020000908';
   let employerName = 'MUZAFFARPUR MUNICIPAL CORPORATION';
   let appointmentDate = '';
   let dispensary = 'Kalambagh Chowk, BH (ESIS Disp.)';
   let branchOffice = 'DCBO - Muzaffarpur, ESIC DCBO, Behind S.B.I. Bhagwanpur Chowk';
+  let printDate = '';
   const familyMembers: EmployeeFamilyMember[] = [];
-  let nominee: { name: string; relation: string; share?: string } | undefined = undefined;
+  let nominee: { name: string; relation: string; share?: string; address?: string } | undefined = undefined;
 
   // 1. IP Number
   const ipMatch = cleanText.match(/(?:Insurance\s*No\.?|IP\s*Number|IP\s*No\.?)[^\d]*[:\-]?\s*(\d{10})/i);
@@ -117,7 +149,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     insuranceNo = ipMatch[1];
   }
 
-  // 2. Personal Details (Handles label-stacking in PyPDF / pdfjs output)
+  // 2. Personal Details (PyPDF / pdfjs Sequential Value Block)
   const personalIdx = lines.findIndex((l) => /PERSONAL\s*DETAILS/i.test(l));
   if (personalIdx !== -1) {
     const pLines: string[] = [];
@@ -138,9 +170,9 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // Linear Fallbacks for Personal Details
+  // Fallbacks if text was rendered linearly
   if (!name) {
-    const m = cleanText.match(/Name\s*of\s*IP[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Date of Birth|DOB|Gender|Mobile|$))/i);
+    const m = cleanText.match(/Name\s*of\s*IP[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Date of Birth|DOB|Gender|Mobile|Email|$))/i);
     if (m) name = cleanExtractedString(m[1]);
   }
   if (!dob) {
@@ -150,6 +182,10 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
   if (!mobileNo) {
     const m = cleanText.match(/Mobile\s*Number[\s\S]*?[:\|]\s*(\d{10})/i);
     if (m) mobileNo = m[1];
+  }
+  if (!registrationDate) {
+    const m = cleanText.match(/Registration\s*Date[\s\S]*?[:\|]\s*(\d{2}[\/\-]\d{2}[\/\-]\d{4})/i);
+    if (m) registrationDate = normalizeDate(m[1]);
   }
 
   // 3. Registration Details (Father/Husband, Marital Status, Address)
@@ -164,7 +200,9 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     const impFamilyIdx = rLines.findIndex((l) => /IMP\s*for\s*Family/i.test(l));
     if (impFamilyIdx !== -1 && impFamilyIdx + 1 < rLines.length) {
       const vals = rLines.slice(impFamilyIdx + 1);
-      if (vals.length > 0 && /Married|Unmarried/i.test(vals[0])) maritalStatus = vals[0];
+      if (vals.length > 0 && /Married|Unmarried|Widow|Divorced/i.test(vals[0])) {
+        maritalStatus = vals[0];
+      }
 
       let cur = 2; // skip status & disability
       const pAddr: string[] = [];
@@ -189,24 +227,35 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // Fallbacks for Address & Father
+  // Linear Fallbacks for Registration
   if (!fatherOrHusbandName) {
-    const m = cleanText.match(/Name\s*of\s*Father\s*\/?\s*Husband[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Permanent|Present|Address|Dispensary|$))/i);
+    const m = cleanText.match(/Name\s*of\s*Father\s*\/?\s*Husband[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Permanent|Present|Address|Dispensary|Type|$))/i);
     if (m) fatherOrHusbandName = cleanExtractedString(m[1]);
   }
   if (!presentAddress) {
-    const m = cleanText.match(/Present\s*Address[\s\S]*?[:\|]\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s+(?:Dispensary|Permanent|$))/i);
+    const m = cleanText.match(/Present\s*Address[\s\S]*?[:\|]\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s+(?:Dispensary|Permanent|CURRENT|$))/i);
     if (m) presentAddress = cleanAddressString(m[1]);
+  }
+  if (!permanentAddress) {
+    const m = cleanText.match(/Permanent\s*Address[\s\S]*?[:\|]\s*([A-Za-z0-9\s,.:\-\/]+?)(?=\s+(?:Dispensary|CURRENT|$))/i);
+    if (m) permanentAddress = cleanAddressString(m[1]);
   }
 
   // 4. Employer Details
   const empCodeMatch = cleanText.match(/\b(\d{17})\b/);
   if (empCodeMatch) employerCode = empCodeMatch[1];
 
+  if (cleanText.includes('MUZAFFARPUR MUNICIPAL CORPORATION')) {
+    employerName = 'MUZAFFARPUR MUNICIPAL CORPORATION';
+  } else {
+    const empNameMatch = cleanText.match(/Name\s*of\s*Employer[\s\S]*?[:\|]\s*([A-Za-z0-9\s,\.\(\)&\'\-]+?)(?=\s+(?:Date\s*of|Sub\s*Unit|Address|$))/i);
+    if (empNameMatch) employerName = cleanExtractedString(empNameMatch[1]);
+  }
+
   const apptMatch = cleanText.match(/(?:Appointment|None)[\s\S]*?(\d{2}[\/\-]\d{2}[\/\-]\d{4})/i);
   if (apptMatch) appointmentDate = normalizeDate(apptMatch[1]);
 
-  // 5. Family Members (Clean regex matching without header pollution)
+  // 5. Family Members (Robust Extraction without Header Noise)
   const famRegex = /([A-Za-z\s]{3,35})\s+(Spouse|Dependant\s+unmarried\s+daughter|Minor\s+dependant\s+son|Dependant\s+mother|Father)\s+(\d{2}[\/\-]\d{2}[\/\-]\d{4})/gi;
   let fMatch;
   while ((fMatch = famRegex.exec(cleanText)) !== null) {
@@ -215,6 +264,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
       .replace(/with\s*IP/gi, '')
       .replace(/Name/gi, '')
       .replace(/Relation/gi, '')
+      .replace(/Date\s*of\s*Birth/gi, '')
       .trim();
 
     const cleanMemName = cleanExtractedString(rawName);
@@ -227,7 +277,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // 6. Nominee Details (From Page 2)
+  // 6. Nominee Details (Page 2)
   const nomMatch = cleanText.match(/\n([A-Za-z\s]{3,30})\s+(Spouse|Dependant\s+mother|Minor\s+dependant\s+son|Mother|Father)\s+(?:NA|\d{2}[\/\-]\d{2}[\/\-]\d{4})?\s+100/i);
   if (nomMatch) {
     const rawNomName = nomMatch[1].split('\n').pop()?.trim() || '';
@@ -235,8 +285,13 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
       name: cleanExtractedString(rawNomName),
       relation: nomMatch[2].replace(/\s+/g, ' ').trim(),
       share: '100%',
+      address: presentAddress || '',
     };
   }
+
+  // 7. Print Date
+  const dateMatch = cleanText.match(/Date\s*:\s*(\d{2}[\/\-]\d{2}[\/\-]\d{4}\s+\d{2}:\d{2}:\d{2})/i);
+  if (dateMatch) printDate = dateMatch[1];
 
   const relationType: 'Father' | 'Husband' =
     maritalStatus === 'Married' && gender === 'Female' ? 'Husband' : 'Father';
@@ -256,7 +311,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     pincode: '842001',
     employerName,
     employerCode: employerCode || '42001884020000908',
-    employerAddress: 'Near Muzaffarpur Railway Station, Civil Court Campus, Town, Dist: Muzaffarpur Bihar 842001',
+    employerAddress: 'Near Muzaffarpur Railway Station, Civil Court Campus, Hpo Ps Town, Dist: Muzaffarpur Bihar 842001',
     appointmentDate: appointmentDate || '',
     dispensary,
     branchOffice,
@@ -265,7 +320,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     employeePhoto: gender === 'Female' ? DEFAULT_AVATAR_FEMALE : DEFAULT_AVATAR_MALE,
     familyPhoto: DEFAULT_FAMILY_PHOTO,
     employeeSignature: DEFAULT_EMPLOYEE_SIGNATURE,
-    sourcePdfName: fileName || 'ESIC_Document.pdf',
+    sourcePdfName: fileName || 'ESIC_ePehchan_Document.pdf',
   };
 
   return {
