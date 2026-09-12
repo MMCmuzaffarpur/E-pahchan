@@ -7,6 +7,7 @@ import {
   Download,
   Edit3,
   ShieldCheck,
+  QrCode,
 } from 'lucide-react';
 import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
@@ -21,6 +22,7 @@ interface IdCardModalProps {
   settings: GlobalSettings;
   onEdit: (emp: EmployeeRecord) => void;
   onOpenPrintPreview: (emp: EmployeeRecord) => void;
+  onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }
 
 export const IdCardModal: React.FC<IdCardModalProps> = ({
@@ -30,6 +32,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
   settings,
   onEdit,
   onOpenPrintPreview,
+  onViewProfilePDF,
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [viewMode, setViewMode] = useState<'3d-flip' | 'dual-side'>('dual-side');
@@ -183,7 +186,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
                   className="absolute inset-0 backface-hidden rounded-xl overflow-hidden shadow-2xl"
                   style={{ border: '1px solid #cbd5e1' }}
                 >
-                  <FrontCardView employee={employee} settings={settings} />
+                  <FrontCardView employee={employee} settings={settings} onViewProfilePDF={onViewProfilePDF} />
                 </div>
 
                 <div
@@ -213,7 +216,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
                 className="w-full max-w-[465px] aspect-[85.6/54] rounded-xl overflow-hidden shadow-2xl shrink-0"
                 style={{ border: '1px solid #cbd5e1' }}
               >
-                <FrontCardView employee={employee} settings={settings} />
+                <FrontCardView employee={employee} settings={settings} onViewProfilePDF={onViewProfilePDF} />
               </div>
 
               <div
@@ -229,13 +232,25 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 
         {/* Modal Bottom Action Bar */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex flex-wrap items-center justify-between gap-3">
-          <button
-            onClick={() => onEdit(employee)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Edit Details & Signatures</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onEdit(employee)}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Edit Details & Signatures</span>
+            </button>
+
+            {onViewProfilePDF && (
+              <button
+                onClick={() => onViewProfilePDF(employee)}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-xs font-semibold text-emerald-300 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                <span>View Scan PDF Profile</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -262,12 +277,13 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Includes GS1 Style Barcode)
+   FRONT CARD VIEW COMPONENT (GS1 Barcode with Unique Numeric/Alpha ID)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
-}> = ({ employee }) => {
+  onViewProfilePDF?: (emp: EmployeeRecord) => void;
+}> = ({ employee, onViewProfilePDF }) => {
   // Generate authentic vertical barcode stripes
   const ipStr = employee.insuranceNo || '4216832815';
   const barcodeBars = [];
@@ -281,18 +297,20 @@ export const FrontCardView: React.FC<{
         key={i}
         style={{
           width,
-          height: '24px',
+          height: '22px',
           backgroundColor: isDark ? '#000000' : '#1e293b',
         }}
       />
     );
   }
 
-  // Generate GS1 style unique numeric string underneath
+  // GS1 style unique numeric string underneath barcode as requested
   const formattedBarcodeText = `(01) ${employee.insuranceNo.slice(0, 10)} (17) 261231 (10) ESIC01`;
 
   return (
     <div
+      onClick={() => onViewProfilePDF && onViewProfilePDF(employee)}
+      title="Click to view scan profile"
       style={{
         width: '100%',
         height: '100%',
@@ -306,6 +324,7 @@ export const FrontCardView: React.FC<{
         backgroundColor: '#ffffff',
         color: '#000000',
         boxSizing: 'border-box',
+        cursor: onViewProfilePDF ? 'pointer' : 'default',
       }}
     >
       {/* 1. TOP HEADER */}
@@ -402,7 +421,7 @@ export const FrontCardView: React.FC<{
         }}
       >
         {/* Left Demographics Details + GS1 Barcode */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2.5px', fontSize: '9px', color: '#000000' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '9px', color: '#000000' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
@@ -440,7 +459,7 @@ export const FrontCardView: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#1e293b' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 600, fontSize: '7.5px', lineHeight: 1.15, color: '#0f172a', maxHeight: '22px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 600, fontSize: '7.5px', lineHeight: 1.15, color: '#0f172a', maxHeight: '20px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
@@ -452,12 +471,12 @@ export const FrontCardView: React.FC<{
             </span>
           </div>
 
-          {/* AUTHENTIC GS1 BARCODE BELOW NOMINEE */}
+          {/* AUTHENTIC GS1 BARCODE WITH UNIQUE NUMERIC STRING */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: '1px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 2px' }}>
               {barcodeBars}
             </div>
-            <span style={{ fontSize: '6.5px', fontFamily: 'monospace', fontWeight: 700, color: '#1e293b', letterSpacing: '0.2px', marginTop: '-1px' }}>
+            <span style={{ fontSize: '6px', fontFamily: 'monospace', fontWeight: 700, color: '#1e293b', letterSpacing: '0.1px', marginTop: '-1px' }}>
               {formattedBarcodeText}
             </span>
           </div>
