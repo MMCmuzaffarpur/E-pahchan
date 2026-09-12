@@ -73,13 +73,9 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
         },
       };
 
-      // 1. Render Front Canvas
       const canvasFront = await html2canvas(frontEl, captureOptions);
-
-      // 2. Render Back Canvas
       const canvasBack = await html2canvas(backEl, captureOptions);
 
-      // 3. Combine both with comfortable padding
       const gap = 30;
       const padding = 25;
       const combinedWidth = canvasFront.width + canvasBack.width + gap + padding * 2;
@@ -93,12 +89,9 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
       if (ctx) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, combinedWidth, combinedHeight);
-
-        // Draw Front & Back Cards
         ctx.drawImage(canvasFront, padding, padding);
         ctx.drawImage(canvasBack, padding + canvasFront.width + gap, padding);
 
-        // Instant Download
         const imageUri = combinedCanvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
         downloadLink.href = imageUri;
@@ -175,7 +168,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Center: Cards Stage (Responsive Without Horizontal Overflow) */}
+        {/* Modal Center: Cards Stage */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-950/60 relative min-h-[460px]">
           {viewMode === '3d-flip' ? (
             <div className="perspective-1000 w-full flex flex-col items-center">
@@ -269,7 +262,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Responsive - Fits Comfortably)
+   FRONT CARD VIEW COMPONENT (Compact Natural Spacing)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
@@ -343,7 +336,7 @@ export const FrontCardView: React.FC<{
         </div>
       </div>
 
-      {/* BACKGROUND WATERMARK: Fully Contained Inside Card Body */}
+      {/* BACKGROUND WATERMARK */}
       <div
         style={{
           position: 'absolute',
@@ -372,21 +365,21 @@ export const FrontCardView: React.FC<{
         />
       </div>
 
-      {/* 2. CARD BODY */}
+      {/* 2. CARD BODY: Clean, Compact Text Gap */}
       <div
         style={{
           flex: 1,
-          padding: '6px 10px',
+          padding: '8px 12px',
           display: 'flex',
-          gap: '8px',
+          gap: '10px',
           alignItems: 'center',
           position: 'relative',
           zIndex: 10,
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', height: '100%', fontSize: '9px', color: '#1e293b' }}>
+        {/* Left Demographics Details (Natural Compact Gaps) */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '9px', color: '#1e293b' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11.5px', color: '#0b3c75' }}>
@@ -424,7 +417,7 @@ export const FrontCardView: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 500, fontSize: '8px', lineHeight: 1.2, color: '#334155', maxHeight: '30px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 500, fontSize: '8px', lineHeight: 1.2, color: '#334155', maxHeight: '28px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
@@ -493,7 +486,7 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Responsive - Fits Comfortably)
+   BACK CARD VIEW COMPONENT (Signatures Sata Kar Directly on Blue Patti)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -584,10 +577,9 @@ export const BackCardView: React.FC<{
       <div
         style={{
           flex: 1,
-          padding: '5px 8px 0 8px',
+          padding: '4px 8px 0 8px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
           position: 'relative',
           zIndex: 10,
           boxSizing: 'border-box',
@@ -623,77 +615,80 @@ export const BackCardView: React.FC<{
           </table>
         </div>
 
-        {/* Signatures Area: Anchored directly right above Blue Patti */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 12px 2px 12px', fontSize: '7px' }}>
-          {/* Employee Sign Box */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
-            <div style={{ height: '26px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {isGenuineSignature ? (
-                <img
-                  src={employee.employeeSignature}
-                  alt=""
-                  style={{
-                    maxHeight: '100%',
-                    maxWidth: '100%',
-                    objectFit: 'contain',
-                    mixBlendMode: 'multiply',
-                    filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: '7.5px', fontStyle: 'italic', color: '#94a3b8' }}>Sign / LTI</span>
-              )}
+        {/* BOTTOM CONTAINER: Signatures + Blue Patti Directly Connected */}
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {/* Signatures Sitting Directly on Top of the Blue Patti */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 16px 1px 16px', fontSize: '7px' }}>
+            {/* Employee Sign Box */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
+              <div style={{ height: '24px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {isGenuineSignature ? (
+                  <img
+                    src={employee.employeeSignature}
+                    alt=""
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      mixBlendMode: 'multiply',
+                      filter: 'invert(16%) sepia(100%) saturate(6500%) hue-rotate(220deg) brightness(80%) contrast(130%)',
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '7.5px', fontStyle: 'italic', color: '#94a3b8' }}>Sign / LTI</span>
+                )}
+              </div>
+              <span style={{ fontWeight: 500, color: '#334155', lineHeight: 1.1 }}>
+                Employee Sign / LTI
+              </span>
             </div>
-            <span style={{ fontWeight: 500, color: '#334155' }}>
-              Employee Sign / LTI
-            </span>
+
+            {/* Employer Sign Box */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
+              <div style={{ height: '24px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {settings.employerSignature ? (
+                  <img
+                    src={settings.employerSignature}
+                    alt=""
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      mixBlendMode: 'multiply',
+                    }}
+                  />
+                ) : null}
+              </div>
+              <span style={{ fontWeight: 'bold', color: '#334155', lineHeight: 1.1 }}>
+                Auth. Signatory (ESIC)
+              </span>
+            </div>
           </div>
 
-          {/* Employer Sign Box */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
-            <div style={{ height: '26px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {settings.employerSignature ? (
-                <img
-                  src={settings.employerSignature}
-                  alt=""
-                  style={{
-                    maxHeight: '100%',
-                    maxWidth: '100%',
-                    objectFit: 'contain',
-                    mixBlendMode: 'multiply',
-                  }}
-                />
-              ) : null}
-            </div>
-            <span style={{ fontWeight: 'bold', color: '#334155' }}>
-              Auth. Signatory (ESIC)
+          {/* Blue Patti with Employer Details */}
+          <div
+            style={{
+              height: '18px',
+              padding: '0 6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '7px',
+              backgroundColor: '#0b3c75',
+              color: '#ffffff',
+              borderTopLeftRadius: '3px',
+              borderTopRightRadius: '3px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span style={{ fontWeight: 'bold', color: '#bfdbfe' }}>Employer:</span>
+            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>
+              {employee.employerName}
+            </span>
+            <span style={{ fontSize: '6.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
+              {employee.employerCode || '42001884020000908'}
             </span>
           </div>
-        </div>
-
-        {/* Blue Patti with Employer Details */}
-        <div
-          style={{
-            height: '18px',
-            padding: '0 6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '7px',
-            backgroundColor: '#0b3c75',
-            color: '#ffffff',
-            borderTopLeftRadius: '3px',
-            borderTopRightRadius: '3px',
-            boxSizing: 'border-box',
-          }}
-        >
-          <span style={{ fontWeight: 'bold', color: '#bfdbfe' }}>Employer:</span>
-          <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>
-            {employee.employerName}
-          </span>
-          <span style={{ fontSize: '6.5px', fontFamily: 'monospace', color: '#bfdbfe' }}>
-            {employee.employerCode || '42001884020000908'}
-          </span>
         </div>
       </div>
 
