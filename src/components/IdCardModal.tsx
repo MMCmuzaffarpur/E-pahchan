@@ -11,7 +11,7 @@ import {
 import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
 
-// Correct path import through utility
+// 100% Fail-Proof Embedded Logo Import
 import { ESIC_EMBEDDED_LOGO } from '../utils/esicLogoData';
 
 interface IdCardModalProps {
@@ -237,7 +237,7 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Clean Layout + Center Colored Blur Watermark)
+   FRONT CARD VIEW COMPONENT (Watermark Shifted Down + Dispensary in Footer)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
@@ -245,16 +245,16 @@ export const FrontCardView: React.FC<{
 }> = ({ employee }) => {
   return (
     <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
-      {/* BACKGROUND WATERMARK: Centered Subtle Blurred Colored ESIC Logo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+      {/* BACKGROUND WATERMARK: Moved Slightly Down to Perfect Card Center */}
+      <div className="absolute inset-x-0 top-[56%] -translate-y-1/2 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
         <img
           src={ESIC_EMBEDDED_LOGO}
           alt=""
-          className="w-44 h-44 object-contain opacity-15 blur-[0.8px] select-none"
+          className="w-40 h-40 object-contain opacity-15 blur-[0.8px] select-none"
         />
       </div>
 
-      {/* 1. TOP HEADER: Deep Royal Blue with Official Round Center Emblem */}
+      {/* 1. TOP HEADER */}
       <div className="bg-[#0b3c75] text-white px-3 py-2 flex items-center justify-between relative z-10 border-b-2 border-[#00b4d8]">
         {/* Left Header */}
         <div className="flex-1 text-left">
@@ -266,7 +266,7 @@ export const FrontCardView: React.FC<{
           </p>
         </div>
 
-        {/* Center: Official ESIC Logo from Assets */}
+        {/* Center: Official ESIC Logo */}
         <div className="shrink-0 px-2 flex items-center justify-center">
           <img
             src={ESIC_EMBEDDED_LOGO}
@@ -286,7 +286,7 @@ export const FrontCardView: React.FC<{
         </div>
       </div>
 
-      {/* 2. CARD BODY: Left Details & Right Blank Photo Box */}
+      {/* 2. CARD BODY */}
       <div className="flex-1 p-3 flex gap-3 items-center relative z-10">
         {/* Left Information */}
         <div className="flex-1 space-y-1.5 text-[9px] sm:text-[10px] text-slate-800">
@@ -333,9 +333,9 @@ export const FrontCardView: React.FC<{
           </div>
         </div>
 
-        {/* Right: Pure Blank Photo Box with Border Only */}
+        {/* Right: Blank Photo Frame */}
         <div className="shrink-0 flex flex-col items-center justify-center">
-          <div className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded border border-slate-400 bg-white/90 shadow-inner flex flex-col items-center justify-center">
+          <div className="w-[105px] h-[85px] sm:w-[115px] sm:h-[95px] rounded border border-slate-400 bg-white/70 shadow-inner flex flex-col items-center justify-center">
             <span className="text-[7.5px] font-semibold text-slate-400 uppercase tracking-wider text-center leading-tight">
               AFFIX FAMILY<br />PHOTOGRAPH HERE
             </span>
@@ -344,17 +344,24 @@ export const FrontCardView: React.FC<{
         </div>
       </div>
 
-      {/* 3. FOOTER */}
-      <div className="bg-slate-100 border-t border-slate-200 px-3 py-1 flex items-center justify-between text-[7.5px] text-slate-600 relative z-10">
-        <span className="font-medium">Reg Date: {employee.registrationDate || employee.appointmentDate || '18/05/2023'}</span>
-        <span className="font-semibold text-[#0b3c75]">सामाजिक सुरक्षा / SOCIAL SECURITY</span>
+      {/* 3. FOOTER: Reg Date | Dispensary Address | Samajik Suraksha */}
+      <div className="bg-slate-100/90 border-t border-slate-200 px-2.5 py-1 flex items-center justify-between text-[7px] sm:text-[7.5px] text-slate-600 relative z-10">
+        <span className="font-medium whitespace-nowrap">
+          Reg Date: {employee.registrationDate || employee.appointmentDate || '18/05/2023'}
+        </span>
+        <span className="text-slate-700 font-semibold truncate max-w-[180px] sm:max-w-[210px] px-1 text-center" title={employee.dispensary}>
+          Disp: {employee.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)'}
+        </span>
+        <span className="font-semibold text-[#0b3c75] whitespace-nowrap">
+          सामाजिक सुरक्षा / SOCIAL SECURITY
+        </span>
       </div>
     </div>
   );
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Center Watermark + Authentic Blue Ink Signatures)
+   BACK CARD VIEW COMPONENT (Transparent Watermark + Expanded List + Blue Patti)
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -372,12 +379,12 @@ export const BackCardView: React.FC<{
 
   return (
     <div className="w-full h-full bg-[#ffffff] text-slate-900 flex flex-col justify-between select-none relative overflow-hidden font-sans border border-slate-300">
-      {/* BACKGROUND WATERMARK: Centered Subtle Blurred Colored ESIC Logo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+      {/* BACKGROUND WATERMARK: Fully Visible (No blocking background boxes) */}
+      <div className="absolute inset-x-0 top-[52%] -translate-y-1/2 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
         <img
           src={ESIC_EMBEDDED_LOGO}
           alt=""
-          className="w-44 h-44 object-contain opacity-15 blur-[0.8px] select-none"
+          className="w-40 h-40 object-contain opacity-15 blur-[0.8px] select-none"
         />
       </div>
 
@@ -391,22 +398,22 @@ export const BackCardView: React.FC<{
         </span>
       </div>
 
-      {/* 2. BODY: Family Table, Details & Signatures */}
-      <div className="flex-1 p-2.5 flex flex-col justify-between text-[8px] sm:text-[8.5px] relative z-10">
-        {/* Family Table */}
-        <div>
-          <table className="w-full border-collapse text-[7.5px] sm:text-[8px] text-slate-800 bg-white/90">
+      {/* 2. BODY: Expandable Family Table, Nominee & Signatures */}
+      <div className="flex-1 px-2.5 pt-1.5 pb-0 flex flex-col justify-between text-[8px] sm:text-[8.5px] relative z-10">
+        {/* Expanded Family Table (Supports more members cleanly) */}
+        <div className="overflow-hidden">
+          <table className="w-full border-collapse text-[7.5px] sm:text-[8px] text-slate-800 bg-transparent">
             <thead>
-              <tr className="bg-slate-200/90 text-slate-900 font-bold border-b border-slate-300">
-                <th className="py-1 px-1.5 text-left">Family Member</th>
-                <th className="py-1 px-1.5 text-left">Relationship</th>
-                <th className="py-1 px-1.5 text-left font-mono">DOB</th>
+              <tr className="bg-slate-200/80 text-slate-900 font-bold border-b border-slate-300">
+                <th className="py-0.5 px-1.5 text-left">Family Member</th>
+                <th className="py-0.5 px-1.5 text-left">Relationship</th>
+                <th className="py-0.5 px-1.5 text-left font-mono">DOB</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-200/60">
               {cleanFamily.length > 0 ? (
-                cleanFamily.slice(0, 3).map((f, i) => (
-                  <tr key={i} className="hover:bg-slate-50/80">
+                cleanFamily.slice(0, 5).map((f, i) => (
+                  <tr key={i} className="hover:bg-slate-50/40">
                     <td className="py-0.5 px-1.5 font-semibold text-slate-900">{f.name}</td>
                     <td className="py-0.5 px-1.5 text-slate-600">{f.relation}</td>
                     <td className="py-0.5 px-1.5 font-mono text-slate-700">{f.dob || 'NA'}</td>
@@ -423,33 +430,19 @@ export const BackCardView: React.FC<{
           </table>
         </div>
 
-        {/* Employer & Nominee Info */}
-        <div className="bg-slate-50/90 border border-slate-200 rounded p-1.5 mt-0.5 space-y-0.5 text-[7.5px] sm:text-[8px]">
-          <div className="flex justify-between">
-            <span className="font-bold text-slate-700">Employer:</span>
-            <span className="font-semibold text-slate-900 truncate max-w-[220px]">
-              {employee.employerName}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-bold text-slate-700">Dispensary:</span>
-            <span className="text-slate-800 truncate max-w-[220px]">
-              {employee.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-bold text-slate-700">Nominee:</span>
-            <span className="text-slate-900 font-semibold">
-              {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
-            </span>
-          </div>
+        {/* Nominee Info (Transparent Background - Logo Shows Behind) */}
+        <div className="flex justify-between items-center py-0.5 px-1.5 border border-slate-200/80 rounded bg-transparent text-[7.5px] sm:text-[8px]">
+          <span className="font-bold text-slate-700">Nominee:</span>
+          <span className="text-slate-900 font-semibold truncate">
+            {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
+          </span>
         </div>
 
         {/* Signatures Area */}
-        <div className="flex items-end justify-between pt-1 px-4 text-[7px]">
-          {/* Employee Sign Box */}
+        <div className="flex items-end justify-between px-4 text-[7px] bg-transparent">
+          {/* Employee Sign */}
           <div className="flex flex-col items-center w-32">
-            <div className="h-8 w-full flex items-center justify-center bg-transparent">
+            <div className="h-7 w-full flex items-center justify-center bg-transparent">
               {isGenuineSignature ? (
                 <img
                   src={employee.employeeSignature}
@@ -463,14 +456,14 @@ export const BackCardView: React.FC<{
                 <span className="text-[7.5px] text-slate-400 italic">Sign / LTI</span>
               )}
             </div>
-            <span className="text-slate-700 font-medium text-[7.5px] mt-0.5">
+            <span className="text-slate-700 font-medium text-[7.5px]">
               Employee Sign / LTI
             </span>
           </div>
 
-          {/* Employer Sign Box */}
+          {/* Employer Sign */}
           <div className="flex flex-col items-center w-32">
-            <div className="h-8 w-full flex items-center justify-center bg-transparent relative">
+            <div className="h-7 w-full flex items-center justify-center bg-transparent">
               {settings.employerSignature ? (
                 <img
                   src={settings.employerSignature}
@@ -483,10 +476,21 @@ export const BackCardView: React.FC<{
                 />
               ) : null}
             </div>
-            <span className="text-slate-700 font-semibold text-[7.5px] mt-0.5">
+            <span className="text-slate-700 font-semibold text-[7.5px]">
               Auth. Signatory (ESIC)
             </span>
           </div>
+        </div>
+
+        {/* Blue Patti (Band) with Employer Name Underneath Signatures */}
+        <div className="bg-[#0b3c75] text-white px-2 py-0.5 flex items-center justify-between text-[7px] sm:text-[7.5px] rounded-t font-medium">
+          <span className="font-bold text-blue-200">Employer:</span>
+          <span className="truncate max-w-[280px] font-semibold text-white uppercase">
+            {employee.employerName}
+          </span>
+          <span className="text-[6.5px] text-blue-200 font-mono">
+            {employee.employerCode || '42001884020000908'}
+          </span>
         </div>
       </div>
 
