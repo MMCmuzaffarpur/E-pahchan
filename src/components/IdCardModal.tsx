@@ -262,12 +262,24 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Compact Natural Spacing)
+   FRONT CARD VIEW COMPONENT (Includes Unique Color Barcode below Nominee)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
 }> = ({ employee }) => {
+  // Generate a pseudo-random unique pattern based on IP No for the Color Barcode
+  const ipStr = employee.insuranceNo || '4216832815';
+  const colorBars = [];
+  const palette = ['#0b3c75', '#00b4d8', '#d97706', '#1e293b', '#16a34a', '#dc2626', '#7c3aed'];
+  
+  for (let i = 0; i < 28; i++) {
+    const charCode = ipStr.charCodeAt(i % ipStr.length);
+    const color = palette[(charCode + i) % palette.length];
+    const width = (i % 3 === 0) ? '3px' : (i % 2 === 0 ? '2px' : '1.5px');
+    colorBars.push(<div key={i} style={{ width, height: '18px', backgroundColor: color }} />);
+  }
+
   return (
     <div
       style={{
@@ -365,11 +377,11 @@ export const FrontCardView: React.FC<{
         />
       </div>
 
-      {/* 2. CARD BODY: Clean, Compact Text Gap */}
+      {/* 2. CARD BODY */}
       <div
         style={{
           flex: 1,
-          padding: '8px 12px',
+          padding: '7px 12px',
           display: 'flex',
           gap: '10px',
           alignItems: 'center',
@@ -378,11 +390,11 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details (Natural Compact Gaps) */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '9px', color: '#1e293b' }}>
+        {/* Left Demographics Details + Color Barcode */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3.5px', fontSize: '8.5px', color: '#1e293b' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11.5px', color: '#0b3c75' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '11px', color: '#0b3c75' }}>
               {employee.insuranceNo}
             </span>
           </div>
@@ -403,7 +415,7 @@ export const FrontCardView: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Father / Husband :</span>
-            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+            <span style={{ fontWeight: 600, textTransform: 'uppercase', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
               {employee.fatherOrHusbandName}
             </span>
           </div>
@@ -417,25 +429,35 @@ export const FrontCardView: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Perm. Address :</span>
-            <span style={{ fontWeight: 500, fontSize: '8px', lineHeight: 1.2, color: '#334155', maxHeight: '28px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 500, fontSize: '7.5px', lineHeight: 1.2, color: '#334155', maxHeight: '24px', overflow: 'hidden' }}>
               {employee.address || `${employee.city}, ${employee.state}`}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 'bold', width: '85px', flexShrink: 0, color: '#475569' }}>Nominee :</span>
-            <span style={{ fontWeight: 600, fontSize: '8px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+            <span style={{ fontWeight: 600, fontSize: '7.5px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
+            </span>
+          </div>
+
+          {/* UNIQUE COLOR BARCODE BELOW NOMINEE */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#f8fafc', padding: '1px 3px', border: '1px solid #cbd5e1', borderRadius: '2px' }}>
+              {colorBars}
+            </div>
+            <span style={{ fontSize: '6px', fontFamily: 'monospace', fontWeight: 'bold', color: '#475569' }}>
+              *ESIC-{employee.insuranceNo}*
             </span>
           </div>
         </div>
 
-        {/* Right Photo Frame */}
+        {/* Right Landscape Family Photo Frame */}
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div
             style={{
-              width: '100px',
-              height: '115px',
+              width: '135px',
+              height: '90px',
               borderRadius: '3px',
               border: '1px solid #94a3b8',
               backgroundColor: 'rgba(255,255,255,0.75)',
@@ -486,7 +508,7 @@ export const FrontCardView: React.FC<{
 };
 
 /* =========================================================================
-   BACK CARD VIEW COMPONENT (Signatures Sata Kar Directly on Blue Patti)
+   BACK CARD VIEW COMPONENT
    ========================================================================= */
 export const BackCardView: React.FC<{
   employee: EmployeeRecord;
@@ -617,7 +639,7 @@ export const BackCardView: React.FC<{
 
         {/* BOTTOM CONTAINER: Signatures + Blue Patti Directly Connected */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {/* Signatures Sitting Directly on Top of the Blue Patti */}
+          {/* Signatures */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 16px 1px 16px', fontSize: '7px' }}>
             {/* Employee Sign Box */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '110px' }}>
@@ -665,7 +687,7 @@ export const BackCardView: React.FC<{
             </div>
           </div>
 
-          {/* Blue Patti with Employer Details */}
+          {/* Blue Patti */}
           <div
             style={{
               height: '18px',
