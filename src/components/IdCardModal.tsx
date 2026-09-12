@@ -12,7 +12,7 @@ import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
 
 // Aapke uploaded logo ka path
-const ESIC_ROUND_LOGO = '/assets/logo.png';
+const ESIC_ROUND_LOGO = '/assets/logo.jpg';
 
 interface IdCardModalProps {
   isOpen: boolean;
