@@ -277,14 +277,33 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (Includes Landscape Photo Frame + Scan QR Code)
+   FRONT CARD VIEW COMPONENT (Bigger Clean Barcode - No Text Below)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
   onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }> = ({ employee, onViewProfilePDF }) => {
-  // Generate a clean scannable QR Code SVG representation (Google Lens compatible link simulation)
+  // Generate a bigger, bolder, premium authentic barcode pattern (No text below)
+  const ipStr = employee.insuranceNo || '4216832815';
+  const barcodeBars = [];
+  
+  for (let i = 0; i < 54; i++) {
+    const charCode = ipStr.charCodeAt(i % ipStr.length);
+    const isDark = (charCode + i) % 2 === 0;
+    const width = ((charCode + i) % 4 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
+    barcodeBars.push(
+      <div
+        key={i}
+        style={{
+          width,
+          height: '32px', // Taller height
+          backgroundColor: isDark ? '#000000' : '#1e293b',
+        }}
+      />
+    );
+  }
+
   const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=ESIC-IP-${employee.insuranceNo}`;
 
   return (
@@ -447,11 +466,18 @@ export const FrontCardView: React.FC<{
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
+
+          {/* BIGGER CLEAN BARCODE (NO TEXT BELOW) */}
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: '3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 2px' }}>
+              {barcodeBars}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Landscape Family Photo Frame + Google Lens Scannable QR Code Below It */}
+        {/* Right Column: Landscape Family Photo Frame + Google Lens Scannable QR Code */}
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-          {/* Family Photo Frame (Intact in its original place) */}
+          {/* Family Photo Frame */}
           <div
             style={{
               width: '135px',
@@ -471,7 +497,7 @@ export const FrontCardView: React.FC<{
             </span>
           </div>
 
-          {/* Google Lens Scannable QR Code right below Family Photo */}
+          {/* Google Lens Scannable QR Code */}
           <div
             onClick={(e) => {
               e.stopPropagation();
