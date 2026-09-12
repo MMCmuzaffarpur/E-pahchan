@@ -1,8 +1,8 @@
 // Default high-resolution SVGs and data URLs for realistic previews
 
-export const DEFAULT_EMPLOYER_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" width="240" height="80">
-  <path d="M 20 55 C 35 25, 45 15, 60 45 C 75 75, 85 20, 100 40 C 115 60, 130 30, 150 45 C 170 60, 185 15, 205 35 M 40 60 Q 120 40 220 58 M 140 30 L 160 65" stroke="%231a365d" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="70" y="75" font-family="sans-serif" font-size="10" font-weight="600" fill="%234a5568" letter-spacing="1">AUTH. SIGNATORY</text>
+// Clean Authentic Royal Blue Ball-Pen Ink Employer Signature (Transparent SVG Vector)
+export const DEFAULT_EMPLOYER_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" width="160" height="80">
+  <path d="M 25 55 C 32 35, 40 20, 52 48 C 65 72, 70 25, 82 42 C 95 60, 105 32, 120 45 C 132 55, 140 22, 150 38 M 30 62 Q 85 45, 152 58" stroke="%230b3c75" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
 
 export const DEFAULT_EMPLOYER_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
@@ -17,9 +17,8 @@ export const DEFAULT_EMPLOYER_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http:
   <text x="60" y="70" font-size="8" font-family="sans-serif" font-weight="bold" fill="%231e3a8a" text-anchor="middle">SEAL</text>
 </svg>`;
 
-export const DEFAULT_EMPLOYEE_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60" width="180" height="60">
-  <path d="M 15 40 C 30 15, 45 45, 60 25 C 75 10, 85 50, 105 35 C 125 20, 140 45, 165 30" stroke="%231f2937" stroke-width="2" fill="none" stroke-linecap="round"/>
-</svg>`;
+// Thedhi wavy line hatakar clean empty string rakhein
+export const DEFAULT_EMPLOYEE_SIGNATURE = ``;
 
 export const NATIONAL_EMBLEM_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120">
   <path d="M 50 15 C 38 15 32 24 32 32 C 32 40 37 46 43 49 C 39 52 35 57 35 65 C 35 73 40 80 50 82 C 60 80 65 73 65 65 C 65 57 61 52 57 49 C 63 46 68 40 68 32 C 68 24 62 15 50 15 Z" fill="%23d97706"/>
