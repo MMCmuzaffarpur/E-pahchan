@@ -277,40 +277,18 @@ export const IdCardModal: React.FC<IdCardModalProps> = ({
 };
 
 /* =========================================================================
-   FRONT CARD VIEW COMPONENT (GS1 Barcode with Unique Numeric/Alpha ID)
+   FRONT CARD VIEW COMPONENT (Includes Landscape Photo Frame + Scan QR Code)
    ========================================================================= */
 export const FrontCardView: React.FC<{
   employee: EmployeeRecord;
   settings: GlobalSettings;
   onViewProfilePDF?: (emp: EmployeeRecord) => void;
 }> = ({ employee, onViewProfilePDF }) => {
-  // Generate authentic vertical barcode stripes
-  const ipStr = employee.insuranceNo || '4216832815';
-  const barcodeBars = [];
-  
-  for (let i = 0; i < 48; i++) {
-    const charCode = ipStr.charCodeAt(i % ipStr.length);
-    const isDark = (charCode + i) % 2 === 0;
-    const width = ((charCode + i) % 4 === 0) ? '3px' : (((charCode + i) % 2 === 0) ? '2px' : '1px');
-    barcodeBars.push(
-      <div
-        key={i}
-        style={{
-          width,
-          height: '22px',
-          backgroundColor: isDark ? '#000000' : '#1e293b',
-        }}
-      />
-    );
-  }
-
-  // GS1 style unique numeric string underneath barcode as requested
-  const formattedBarcodeText = `(01) ${employee.insuranceNo.slice(0, 10)} (17) 261231 (10) ESIC01`;
+  // Generate a clean scannable QR Code SVG representation (Google Lens compatible link simulation)
+  const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=ESIC-IP-${employee.insuranceNo}`;
 
   return (
     <div
-      onClick={() => onViewProfilePDF && onViewProfilePDF(employee)}
-      title="Click to view scan profile"
       style={{
         width: '100%',
         height: '100%',
@@ -324,7 +302,6 @@ export const FrontCardView: React.FC<{
         backgroundColor: '#ffffff',
         color: '#000000',
         boxSizing: 'border-box',
-        cursor: onViewProfilePDF ? 'pointer' : 'default',
       }}
     >
       {/* 1. TOP HEADER */}
@@ -420,7 +397,7 @@ export const FrontCardView: React.FC<{
           boxSizing: 'border-box',
         }}
       >
-        {/* Left Demographics Details + GS1 Barcode */}
+        {/* Left Demographics Details */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '9px', color: '#000000' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, width: '90px', flexShrink: 0, color: '#0b3c75' }}>IP No. :</span>
@@ -470,24 +447,15 @@ export const FrontCardView: React.FC<{
               {employee.nominee?.name || 'TULSI KUMARI'} ({employee.nominee?.relation || 'Spouse'}) - 100%
             </span>
           </div>
-
-          {/* AUTHENTIC GS1 BARCODE WITH UNIQUE NUMERIC STRING */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: '1px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', backgroundColor: '#ffffff', padding: '1px 2px' }}>
-              {barcodeBars}
-            </div>
-            <span style={{ fontSize: '6px', fontFamily: 'monospace', fontWeight: 700, color: '#1e293b', letterSpacing: '0.1px', marginTop: '-1px' }}>
-              {formattedBarcodeText}
-            </span>
-          </div>
         </div>
 
-        {/* Right Landscape Family Photo Frame */}
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Right Column: Landscape Family Photo Frame + Google Lens Scannable QR Code Below It */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+          {/* Family Photo Frame (Intact in its original place) */}
           <div
             style={{
               width: '135px',
-              height: '90px',
+              height: '80px',
               borderRadius: '3px',
               border: '1px solid #94a3b8',
               backgroundColor: 'rgba(255,255,255,0.75)',
@@ -498,11 +466,39 @@ export const FrontCardView: React.FC<{
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: '7.5px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center', lineHeight: 1.3, color: '#64748b' }}>
+            <span style={{ fontSize: '7px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center', lineHeight: 1.2, color: '#64748b' }}>
               AFFIX FAMILY<br />PHOTOGRAPH HERE
             </span>
           </div>
-          <span style={{ fontSize: '7px', fontWeight: 500, marginTop: '3px', color: '#64748b' }}>Family Photo</span>
+
+          {/* Google Lens Scannable QR Code right below Family Photo */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onViewProfilePDF) onViewProfilePDF(employee);
+            }}
+            title="Scan to view e-Pehchan PDF Profile"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '3px',
+              padding: '2px 4px',
+              cursor: 'pointer',
+            }}
+          >
+            <img
+              src={qrDataUrl}
+              alt="Scan QR"
+              style={{ width: '26px', height: '26px', objectFit: 'contain' }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '6px', fontWeight: 800, color: '#0b3c75' }}>SCAN PROFILE</span>
+              <span style={{ fontSize: '5px', color: '#475569' }}>Google Lens</span>
+            </div>
+          </div>
         </div>
       </div>
 
