@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { EmployeeRecord, GlobalSettings } from '../types';
 import html2canvas from 'html2canvas';
+import esicRoundLogo from '../../assets/logo.png';
 
 // Aapke uploaded logo ka path
 const ESIC_ROUND_LOGO = '/assets/logo.jpg';
