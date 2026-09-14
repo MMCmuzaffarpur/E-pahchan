@@ -659,7 +659,7 @@ export const BackCardView: React.FC<{
             </thead>
             <tbody>
               {cleanFamily.length > 0 ? (
-                cleanFamily.slice(0, 5).map((f, i) => (
+                cleanFamily.slice(0, 6).map((f, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '2px 4px', fontWeight: 600, color: '#0f172a' }}>{f.name}</td>
                     <td style={{ padding: '2px 4px', color: '#475569' }}>{f.relation}</td>
