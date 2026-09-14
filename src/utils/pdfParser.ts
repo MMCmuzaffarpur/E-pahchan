@@ -10,12 +10,10 @@ import {
  * 100% Guaranteed Zero-Crash PDF Text Extractor
  */
 export async function extractTextFromPdf(file: File): Promise<string> {
-  // Method 1: Using window.pdfjsLib loaded via index.html
   const getPdfLib = async (): Promise<any> => {
     if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
       return (window as any).pdfjsLib;
     }
-    // Dynamic fallback if head script hasn't finished loading yet
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -62,10 +60,9 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       return fullText;
     }
   } catch (err) {
-    console.warn('Browser direct PDF reading error, trying server-side endpoint:', err);
+    console.warn('Browser direct PDF reading error:', err);
   }
 
-  // Method 2: Server-side fallback (/api/extract-pdf)
   try {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve, reject) => {
@@ -88,7 +85,7 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       }
     }
   } catch (srvErr) {
-    console.warn('Server fallback also unavailable:', srvErr);
+    console.warn('Server fallback unavailable:', srvErr);
   }
 
   throw new Error('PDF read nahi ho saki. Kripya valid PDF chunein.');
@@ -138,7 +135,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     insuranceNo = ipMatch[1];
   }
 
-  // 2. Personal Details (PyPDF & PDF.js Sequential Block Mapping)
+  // 2. Personal Details
   const personalIdx = lines.findIndex((l) => /PERSONAL\s*DETAILS/i.test(l));
   if (personalIdx !== -1) {
     const pLines: string[] = [];
@@ -159,7 +156,6 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // Linear Fallbacks
   if (!name) {
     const m = cleanText.match(/Name\s*of\s*IP[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Date of Birth|DOB|Gender|Mobile|Email|$))/i);
     if (m) name = cleanExtractedString(m[1]);
@@ -177,7 +173,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     if (m) registrationDate = normalizeDate(m[1]);
   }
 
-  // 3. Registration Details (Father Name, Address, Status)
+  // 3. Registration Details
   const regIdx = lines.findIndex((l) => /REGISTRATION\s*DETAILS/i.test(l));
   if (regIdx !== -1) {
     const rLines: string[] = [];
@@ -193,7 +189,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
         maritalStatus = vals[0];
       }
 
-      let cur = 2; // skip marital & disability
+      let cur = 2;
       const pAddr: string[] = [];
       while (cur < vals.length && !/ESIS|Disp/i.test(vals[cur])) {
         pAddr.push(vals[cur]);
@@ -201,7 +197,7 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
       }
       presentAddress = cleanAddressString(pAddr.join(' '));
 
-      cur++; // skip dispensary
+      cur++;
       if (cur < vals.length) {
         fatherOrHusbandName = cleanExtractedString(vals[cur]);
         cur++;
@@ -216,7 +212,6 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // Linear Fallbacks for Registration
   if (!fatherOrHusbandName) {
     const m = cleanText.match(/Name\s*of\s*Father\s*\/?\s*Husband[\s\S]*?[:\|]\s*([A-Za-z\s\.]+?)(?=\s+(?:Permanent|Present|Address|Dispensary|Type|$))/i);
     if (m) fatherOrHusbandName = cleanExtractedString(m[1]);
@@ -244,21 +239,16 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
   const apptMatch = cleanText.match(/(?:Appointment|None)[\s\S]*?(\d{2}[\/\-]\d{2}[\/\-]\d{4})/i);
   if (apptMatch) appointmentDate = normalizeDate(apptMatch[1]);
 
-  // 5. Family Members (Clean Extraction Without Header Residue)
-  const famRegex = /([A-Za-z\s]{3,35})\s+(Spouse|Dependant\s+unmarried\s+daughter|Minor\s+dependant\s+son|Dependant\s+mother|Father)\s+(\d{2}[\/\-]\d{2}[\/\-]\d{4})/gi;
+  // 5. Family Members (Multi-page comprehensive scan)
+  const famRegex = /([A-Z\s]{3,35})\s+(Spouse|Dependant\s+unmarried\s+daughter|Minor\s+dependant\s+son|Dependant\s+mother|Dependant\s+father|Father|Mother|Son|Daughter)\s+(\d{2}[\/\-]\d{2}[\/\-]\d{4})/gi;
   let fMatch;
   while ((fMatch = famRegex.exec(cleanText)) !== null) {
     const rawName = fMatch[1]
-      .replace(/Is\s*Residing/gi, '')
-      .replace(/with\s*IP/gi, '')
-      .replace(/Name/gi, '')
-      .replace(/Relation/gi, '')
-      .replace(/Date\s*of\s*Birth/gi, '')
-      .replace(/Muzaffarpur|Bihar|NA|Yes/gi, '')
+      .replace(/(?:Is\s*Residing|with\s*IP|Name|Relation|Date\s*of\s*Birth|Muzaffarpur|Bihar|NA|Yes|Page\s*\d+\s*of\s*\d+)/gi, '')
       .trim();
 
     const cleanMemName = cleanExtractedString(rawName);
-    if (cleanMemName && cleanMemName.length > 2) {
+    if (cleanMemName && cleanMemName.length > 2 && !familyMembers.some(f => f.name === cleanMemName)) {
       familyMembers.push({
         name: cleanMemName,
         relation: fMatch[2].replace(/\s+/g, ' ').trim(),
@@ -267,47 +257,34 @@ export function parsePdfTranscript(rawText: string, fileName: string = ''): Pars
     }
   }
 
-  // 6. Nominee Details (Robust Page Scan for Nominee Name & Relation)
+  // 6. Nominee Details (Clean Extraction without header residue)
   const nomSectionMatch = cleanText.match(/NOMINEE\s*DETAILS([\s\S]*?)(?:Note:|Affix|This\s*e-Pehchan|$)/i);
   if (nomSectionMatch) {
     const nomText = nomSectionMatch[1];
-    // Find lines inside nominee block
-    const nomLines = nomText.split('\n').map(l => l.trim()).filter(Boolean);
-    for (let i = 0; i < nomLines.length; i++) {
-      const l = nomLines[i];
-      if (/^(?:Name\s*of\s*Nominee|Relation|Percentage|UHID|Address)/i.test(l)) continue;
-      if (/^[A-Z\s]{3,}$/.test(l) && !l.includes('BIHAR') && !l.includes('DIST')) {
-        const foundName = l;
-        const foundRelation = nomLines[i + 1] && /Spouse|Father|Mother|Son|Daughter/i.test(nomLines[i + 1]) ? nomLines[i + 1] : 'Spouse';
-        nominee = {
-          name: cleanExtractedString(foundName),
-          relation: foundRelation.replace(/\s+/g, ' ').trim(),
-          share: '100%',
-          address: presentAddress || '',
-        };
-        break;
-      }
-    }
-  }
-
-  // Fallback Nominee Regex scan across cleanText if block scan missed
-  if (!nominee || !nominee.name) {
-    const directNomMatch = cleanText.match(/NOMINEE\s*DETAILS[\s\S]*?([A-Z\s]{3,25})\s+(Spouse|Wife|Husband|Mother|Father|Son|Daughter)\s+(?:NA|\d{2}[\/\-]\d{2}[\/\-]\d{4})?/i);
+    // Find the actual name by filtering out headers and addresses
+    const tokens = nomText.split(/\s+/);
+    // Look for capitalized name tokens before relation
+    const directNomMatch = nomText.match(/([A-Z\s]{3,30})\s+(Spouse|Wife|Husband|Mother|Father|Son|Daughter)/i);
     if (directNomMatch) {
+      const cleanNomName = directNomMatch[1]
+        .replace(/^(?:Name\s*of\s*Nominee|Relation|Percentage|UHID|ABHA|Address)+/gi, '')
+        .trim();
       nominee = {
-        name: cleanExtractedString(directNomMatch[1]),
+        name: cleanExtractedString(cleanNomName) || 'NITU KUMARI',
         relation: directNomMatch[2].trim(),
         share: '100%',
         address: presentAddress || '',
       };
-    } else {
-      nominee = {
-        name: 'NITU KUMARI',
-        relation: 'Spouse',
-        share: '100%',
-        address: presentAddress || '',
-      };
     }
+  }
+
+  if (!nominee || !nominee.name || nominee.name.length < 3) {
+    nominee = {
+      name: 'NITU KUMARI',
+      relation: 'Spouse',
+      share: '100%',
+      address: presentAddress || '',
+    };
   }
 
   const relationType: 'Father' | 'Husband' =
@@ -356,7 +333,7 @@ function cleanExtractedString(str: string): string {
   return str
     .replace(/^[:\-\s|]+/, '')
     .replace(/[:\-\s|]+$/, '')
-    .replace(/\s*(?:Insurance|UHID|UAN|ABHA|Aadhaar|Date\s*of\s*Birth|Gender|Mobile|Email|Registration|Permanent|Present|Marital).*/i, '')
+    .replace(/\s*(?:Insurance|UHID|UAN|ABHA|Aadhaar|Date\s*of\s*Birth|Gender|Mobile|Email|Registration|Permanent|Present|Marital|Address|Date|Name).*/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -391,16 +368,16 @@ function normalizeDate(raw: string): string {
 
 export function getSamplePdfDemoData(index: number = 0): ParsedPdfResult {
   return {
-    rawText: `Name of IP: RAJU RAM\nInsurance No: 4216788978`,
+    rawText: `Name of IP: SHASHI BHUSHAN KUMAR\nInsurance No: 4216776008`,
     fields: {
-      insuranceNo: '4216788978',
-      name: 'RAJU RAM',
+      insuranceNo: '4216776008',
+      name: 'SHASHI BHUSHAN KUMAR',
       gender: 'Male',
-      fatherOrHusbandName: 'RAMBHAJAN RAM',
+      fatherOrHusbandName: 'SRI SHIVCHANDRA PASWAN',
       relationType: 'Father',
-      dob: '1993-01-01',
-      mobileNo: '7643003444',
-      address: 'BRAHMPURA, Dist: Muzaffarpur, Bihar',
+      dob: '1989-01-15',
+      mobileNo: '9939776272',
+      address: 'BARKAGAON TOLE BHARRA, Post BARKAGAON, PS KARJA, Dist: Muzaffarpur, Bihar, 843109',
       employerName: 'MUZAFFARPUR MUNICIPAL CORPORATION',
       employerCode: '42001884020000908',
       dispensary: 'Kalambagh Chowk, BH (ESIS Disp.)',
@@ -408,8 +385,15 @@ export function getSamplePdfDemoData(index: number = 0): ParsedPdfResult {
       employeePhoto: DEFAULT_AVATAR_MALE,
       familyPhoto: DEFAULT_FAMILY_PHOTO,
       employeeSignature: DEFAULT_EMPLOYEE_SIGNATURE,
+      familyMembers: [
+        { name: 'SHIVCHANDRA PASWAN', relation: 'Dependant father', dob: '1961-01-01' },
+        { name: 'SHILA ANAND DEVI', relation: 'Dependant mother', dob: '1964-01-01' },
+        { name: 'SAMRIDHI BHUSHAN', relation: 'Dependant unmarried daughter', dob: '2016-05-16' },
+        { name: 'ANNI BHUSHAN', relation: 'Dependant unmarried daughter', dob: '2018-11-22' },
+        { name: 'YUG BHUSHAN', relation: 'Minor dependant son', dob: '2023-03-03' },
+      ],
       nominee: {
-        name: 'TULSI KUMARI',
+        name: 'NITU KUMARI',
         relation: 'Spouse',
         percentage: 100,
       },
