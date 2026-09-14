@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Building2,
   Users,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { EmployeeRecord, ParsedPdfResult } from '../types';
 import { extractTextFromPdf, parsePdfTranscript, getSamplePdfDemoData, isValidIpNumber } from '../utils/pdfParser';
@@ -57,6 +59,18 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
     try {
       const rawText = await extractTextFromPdf(file);
       const parsed = parsePdfTranscript(rawText, file.name);
+      
+      // Clean up family member names from stray OCR/PDF table header artifacts
+      if (parsed.fields.familyMembers) {
+        parsed.fields.familyMembers = parsed.fields.familyMembers.map((fam) => ({
+          ...fam,
+          name: fam.name
+            .replace(/^(?:ith|is|residing|with|ip|ar|ding|r)\s+/i, '')
+            .replace(/(?:with\s*ip|is\s*residing)/gi, '')
+            .trim(),
+        }));
+      }
+
       setParsedResult(parsed);
       setFormFields(parsed.fields);
     } catch (err: any) {
@@ -76,6 +90,15 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
     setErrorMsg(null);
     try {
       const parsed = parsePdfTranscript(pastedText, 'Pasted_Transcript.pdf');
+      if (parsed.fields.familyMembers) {
+        parsed.fields.familyMembers = parsed.fields.familyMembers.map((fam) => ({
+          ...fam,
+          name: fam.name
+            .replace(/^(?:ith|is|residing|with|ip|ar|ding|r)\s+/i, '')
+            .replace(/(?:with\s*ip|is\s*residing)/gi, '')
+            .trim(),
+        }));
+      }
       setParsedResult(parsed);
       setFormFields(parsed.fields);
       setSelectedFile(new File([pastedText], 'Pasted_Transcript.pdf', { type: 'application/pdf' }));
@@ -92,12 +115,21 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
     setErrorMsg(null);
     setTimeout(() => {
       const sample = getSamplePdfDemoData(index);
+      if (sample.fields.familyMembers) {
+        sample.fields.familyMembers = sample.fields.familyMembers.map((fam) => ({
+          ...fam,
+          name: fam.name
+            .replace(/^(?:ith|is|residing|with|ip|ar|ding|r)\s+/i, '')
+            .replace(/(?:with\s*ip|is\s*residing)/gi, '')
+            .trim(),
+        }));
+      }
       setParsedResult(sample);
       setFormFields(sample.fields);
       setSelectedFile(
         new File(
           ['Sample PDF content'],
-          sample.fields.sourcePdfName || 'ESIC_ePehchan_Abdul_Mogani_Ansari.pdf',
+          sample.fields.sourcePdfName || 'ESIC_ePehchan_Sample.pdf',
           { type: 'application/pdf' }
         )
       );
@@ -112,6 +144,26 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
     }));
   };
 
+  // Handler to update specific family member details
+  const handleFamilyMemberChange = (index: number, key: string, value: string) => {
+    const updatedFamily = [...(formFields.familyMembers || [])];
+    updatedFamily[index] = {
+      ...updatedFamily[index],
+      [key]: value,
+    };
+    setFormFields((prev) => ({ ...prev, familyMembers: updatedFamily }));
+  };
+
+  const handleAddFamilyMember = () => {
+    const updatedFamily = [...(formFields.familyMembers || []), { name: '', relation: 'Dependant', dob: '' }];
+    setFormFields((prev) => ({ ...prev, familyMembers: updatedFamily }));
+  };
+
+  const handleRemoveFamilyMember = (index: number) => {
+    const updatedFamily = (formFields.familyMembers || []).filter((_, i) => i !== index);
+    setFormFields((prev) => ({ ...prev, familyMembers: updatedFamily }));
+  };
+
   const handleSaveToDatabase = () => {
     if (!formFields.name?.trim()) {
       setErrorMsg('Please enter Employee Full Name (कर्मचारी का नाम).');
@@ -119,7 +171,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
     }
 
     if (!formFields.insuranceNo || !isValidIpNumber(formFields.insuranceNo)) {
-      setErrorMsg('Please enter a valid 10-digit Insurance / IP Number (0000000000 is invalid). e.g. 4216789178');
+      setErrorMsg('Please enter a valid 10-digit Insurance / IP Number. e.g. 4216776008');
       return;
     }
 
@@ -140,10 +192,10 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
       employerCode: formFields.employerCode || '42001884020000908',
       employerAddress: formFields.employerAddress || '',
       appointmentDate: formFields.appointmentDate || '',
-      dispensary: formFields.dispensary || '',
+      dispensary: formFields.dispensary || 'Kalambagh Chowk, BH (ESIS Disp.)',
       branchOffice: formFields.branchOffice || '',
       familyMembers: formFields.familyMembers,
-      nominee: formFields.nominee,
+      nominee: formFields.nominee || { name: 'NITU KUMARI', relation: 'Spouse', percentage: 100 },
       employeePhoto: formFields.employeePhoto,
       familyPhoto: formFields.familyPhoto,
       employeeSignature: formFields.employeeSignature,
@@ -200,7 +252,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                PDF अपलोड करें &bull; IP Number (बीमा संख्या), नाम, जन्म तिथि, पता, नियोक्ता विवरण एवं परिवार डेटा ऑटो एक्सट्रेक्ट करें
+                PDF अपलोड करें &bull; सभी डेटा टेक्स्ट बॉक्स में शो होगा, जिसे आप एडिट करके सेव कर सकते हैं
               </p>
             </div>
           </div>
@@ -223,9 +275,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
           )}
 
           {!parsedResult ? (
-            /* Upload Dropzone + Paste tab + Sample PDF selector */
             <div className="space-y-6">
-              {/* Option Tabs */}
               <div className="grid grid-cols-2 gap-3 p-1 bg-slate-950 rounded-2xl border border-slate-800 text-xs font-semibold">
                 <button
                   type="button"
@@ -237,7 +287,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   }`}
                 >
                   <FileUp className="w-4 h-4" />
-                  <span>Upload PDF File (PDF फाइल चुनें)</span>
+                  <span>Upload PDF File (PDF चुनें)</span>
                 </button>
                 <button
                   type="button"
@@ -249,7 +299,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   }`}
                 >
                   <ClipboardPaste className="w-4 h-4" />
-                  <span>Paste Transcript / OCR Text (टेक्स्ट पेस्ट करें)</span>
+                  <span>Paste Transcript Text (टेक्स्ट पेस्ट करें)</span>
                 </button>
               </div>
 
@@ -269,26 +319,26 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                     <FileText className="w-8 h-8" />
                   </div>
                   <h3 className="text-sm font-bold text-white mb-1">
-                    Click to Browse or Drag & Drop Government ESIC PDF File
+                    Click to Browse or Drag & Drop ESIC PDF File
                   </h3>
                   <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    Supports 1 to 3+ page official ESIC e-Pehchan cards, employee transcripts, and insurance registration documents.
+                    Supports official ESIC e-Pehchan cards (e.g. Shashi Bhushan Kumar PDF specification).
                   </p>
                   <div className="inline-flex items-center gap-1.5 mt-4 px-3.5 py-1.5 rounded-full bg-slate-800 text-[11px] font-semibold text-amber-300 border border-slate-700">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    Auto IP Number & Column Extraction
+                    Auto Extract & Fully Editable
                   </div>
                 </div>
               ) : (
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <label className="block text-xs font-semibold text-slate-300">
-                    Paste raw text copied from ESIC PDF or OCR below:
+                    Paste raw text copied from ESIC PDF below:
                   </label>
                   <textarea
                     rows={6}
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
-                    placeholder={`Name of IP : ABDUL MOGANI ANSARI\nInsurance No. : 4216789178\nDate of Birth : 15/12/1972\nGender : Male\nMobile Number : 7366899546\nName of Father / Husband : MD SAMI ANSARI\nPresent Address : SADPURA KASAB TOLA NEAR KACHANA SONAR,Dist:Muzaffarpur,Bihar,842002\nEmployer's Code No. : 42001884020000908\nName of Employer : MUZAFFARPUR MUNICIPAL CORPORATION`}
+                    placeholder={`Name of IP : SHASHI BHUSHAN KUMAR\nInsurance No. : 4216776008\nDate of Birth : 15/01/1989\nGender : Male\nMobile Number : 9939776272\nName of Father / Husband : SRI SHIVCHANDRA PASWAN`}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono focus:border-blue-500 focus:outline-none"
                   />
                   <button
@@ -298,99 +348,46 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                     className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/30"
                   >
                     <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>Extract Data From Pasted Text / डेटा एक्सट्रेक्ट करें</span>
+                    <span>Extract Data & Edit Fields</span>
                   </button>
                 </div>
               )}
 
-              {/* Instant One-Click Government Sample PDFs */}
+              {/* Sample PDF buttons */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-bold text-white">
-                      Instant Test Government Samples / तुरंत टेस्ट करने हेतु सैंपल चुनें:
+                      Instant Test Government Samples / सैंपल चुनें:
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-medium">1-Click Auto Extract</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => handleLoadSampleDemo(0)}
-                    className="p-3 rounded-xl bg-amber-950/30 hover:bg-amber-950/70 border border-amber-700/60 hover:border-amber-400 text-left transition-all group cursor-pointer"
+                    className="p-3 rounded-xl bg-amber-950/30 hover:bg-amber-950/70 border border-amber-700/60 text-left transition-all cursor-pointer"
                   >
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-amber-300 group-hover:text-amber-200 truncate">
-                        📄 Abdul Mogani Ansari
-                      </p>
-                      <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950 px-1 rounded border border-emerald-800">
-                        MMC
-                      </span>
-                    </div>
-                    <p className="text-[10px] font-mono text-amber-400 font-bold mt-1">
-                      IP: 4216789178
-                    </p>
-                    <p className="text-[9px] text-slate-400 truncate">
-                      Muzaffarpur Municipal Corp
-                    </p>
+                    <p className="text-xs font-bold text-amber-300 truncate">📄 Shashi Bhushan Kumar (4216776008)</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Muzaffarpur Municipal Corporation &bull; Family & Nominee</p>
                   </button>
-
                   <button
                     type="button"
                     onClick={() => handleLoadSampleDemo(1)}
-                    className="p-3 rounded-xl bg-slate-900 hover:bg-blue-950/60 border border-slate-800 hover:border-blue-700/60 text-left transition-all group cursor-pointer"
+                    className="p-3 rounded-xl bg-slate-900 hover:bg-blue-950/60 border border-slate-800 text-left transition-all cursor-pointer"
                   >
-                    <p className="text-xs font-bold text-slate-200 group-hover:text-blue-300 truncate">
-                      📄 Baby Devi (ESIC)
-                    </p>
-                    <p className="text-[10px] font-mono text-slate-300 font-bold mt-1">
-                      IP: 4216776809
-                    </p>
-                    <p className="text-[9px] text-slate-500 truncate">
-                      Muzaffarpur Municipal Corp
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleLoadSampleDemo(2)}
-                    className="p-3 rounded-xl bg-slate-900 hover:bg-blue-950/60 border border-slate-800 hover:border-blue-700/60 text-left transition-all group cursor-pointer"
-                  >
-                    <p className="text-xs font-bold text-slate-200 group-hover:text-blue-300 truncate">
-                      📄 Ramesh Kumar Verma
-                    </p>
-                    <p className="text-[10px] font-mono text-slate-300 font-bold mt-1">
-                      IP: 3109845621
-                    </p>
-                    <p className="text-[9px] text-slate-500 truncate">
-                      Bharat Logistics Corp
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleLoadSampleDemo(3)}
-                    className="p-3 rounded-xl bg-slate-900 hover:bg-blue-950/60 border border-slate-800 hover:border-blue-700/60 text-left transition-all group cursor-pointer"
-                  >
-                    <p className="text-xs font-bold text-slate-200 group-hover:text-blue-300 truncate">
-                      📄 Sunita Devi
-                    </p>
-                    <p className="text-[10px] font-mono text-slate-300 font-bold mt-1">
-                      IP: 3114589632
-                    </p>
-                    <p className="text-[9px] text-slate-500 truncate">
-                      Tirhut Textile & Garments
-                    </p>
+                    <p className="text-xs font-bold text-slate-200 truncate">📄 Abdul Mogani Ansari (4216789178)</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Muzaffarpur Municipal Corporation</p>
                   </button>
                 </div>
               </div>
             </div>
           ) : (
-            /* Parsed Transcript Preview & Column Editor */
+            /* Parsed & Fully Editable Form Fields */
             <div className="space-y-5">
-              {/* Success Banner */}
               <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-700 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-emerald-600/20 border border-emerald-500 flex items-center justify-center text-emerald-400">
@@ -399,14 +396,11 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-bold text-emerald-200">
-                        PDF Transcript & IP Number Extracted Successfully!
+                        PDF Parsed Successfully! Now Edit Any Field Below Before Saving:
                       </p>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400 text-slate-950 shadow">
-                        IP: {formFields.insuranceNo}
-                      </span>
                     </div>
                     <p className="text-[11px] text-emerald-300/80 mt-0.5">
-                      File: {selectedFile?.name} &bull; All official fields mapped correctly
+                      File: {selectedFile?.name} &bull; All text boxes are fully editable
                     </p>
                   </div>
                 </div>
@@ -426,30 +420,25 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   type="button"
                   onClick={() => setActiveTab('columns')}
                   className={`pb-2 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'columns'
-                      ? 'border-amber-500 text-amber-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                    activeTab === 'columns' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-400'
                   }`}
                 >
                   <Database className="w-3.5 h-3.5" />
-                  <span>Column Wise Data Preview (कॉलम डेटा)</span>
+                  <span>Editable Form Textboxes (सभी डेटा टेक्स्ट बॉक्स में एडिट करें)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('raw')}
                   className={`pb-2 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'raw'
-                      ? 'border-amber-500 text-amber-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                    activeTab === 'raw' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-400'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Raw Extracted Transcript (ट्रांसक्रिप्ट टेक्स्ट)</span>
+                  <span>Raw Transcript</span>
                 </button>
               </div>
 
               {activeTab === 'columns' ? (
-                /* Detailed Column Editor */
                 <div className="space-y-4">
                   {/* IP Number & Name Header Card */}
                   <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/40 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -461,144 +450,116 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                         </label>
                         {isValidIpNumber(formFields.insuranceNo) ? (
                           <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Valid 10 Digits
+                            <CheckCircle2 className="w-3 h-3" /> Valid
                           </span>
                         ) : (
                           <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> 10 Digits Required (Non-zero)
+                            <AlertCircle className="w-3 h-3" /> 10 Digits Required
                           </span>
                         )}
                       </div>
                       <input
                         type="text"
                         maxLength={10}
-                        placeholder="e.g. 4216789178"
                         value={formFields.insuranceNo || ''}
                         onChange={(e) => {
                           const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                           handleFieldChange('insuranceNo', val);
                         }}
-                        className={`w-full bg-slate-950 border-2 rounded-xl px-3 py-2 text-sm font-mono font-bold focus:outline-none transition-colors ${
-                          isValidIpNumber(formFields.insuranceNo)
-                            ? 'border-emerald-500/80 text-emerald-300 focus:border-emerald-400'
-                            : 'border-rose-500/80 text-rose-300 focus:border-amber-400'
-                        }`}
+                        className="w-full bg-slate-950 border-2 border-emerald-500/80 text-emerald-300 rounded-xl px-3 py-2 text-sm font-mono font-bold focus:outline-none"
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        ESIC 10-अंक की बीमा संख्या। अगर PDF में शून्य (0000000000) था, तो सही 10-अंक का IP नंबर यहाँ दर्ज करें।
-                      </p>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-200">
-                          Employee Full Name / Name of IP (कर्मचारी का नाम) *
-                        </label>
-                        <span className="text-[10px] text-slate-400">As per ESIC Record</span>
-                      </div>
+                      <label className="block text-xs font-bold text-slate-200 mb-1">
+                        Employee Full Name / Name of IP *
+                      </label>
                       <input
                         type="text"
-                        placeholder="e.g. ABHISHEK MASIH"
                         value={formFields.name || ''}
                         onChange={(e) => handleFieldChange('name', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold"
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        कर्मचारी का पूरा नाम (पासपोर्ट एवं पहचान पत्र के अनुसार)
-                      </p>
                     </div>
                   </div>
 
-                  {/* Personal & Registration Details */}
+                  {/* Personal & Registration Details Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Gender (लिंग)
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Gender</label>
                       <select
                         value={formFields.gender || 'Male'}
                         onChange={(e) => handleFieldChange('gender', e.target.value as any)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       >
-                        <option value="Male">Male (पुरुष)</option>
-                        <option value="Female">Female (महिला)</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
                         <option value="Other">Other</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Relation Type
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Relation Type</label>
                       <select
                         value={formFields.relationType || 'Father'}
                         onChange={(e) => handleFieldChange('relationType', e.target.value as any)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       >
-                        <option value="Father">Father (पिता)</option>
-                        <option value="Husband">Husband (पति)</option>
+                        <option value="Father">Father</option>
+                        <option value="Husband">Husband</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Father / Husband Name
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Father / Husband Name</label>
                       <input
                         type="text"
                         value={formFields.fatherOrHusbandName || ''}
                         onChange={(e) => handleFieldChange('fatherOrHusbandName', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Date of Birth (जन्म तिथि)
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Date of Birth</label>
                       <input
-                        type="date"
+                        type="text"
                         value={formFields.dob || ''}
                         onChange={(e) => handleFieldChange('dob', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                        placeholder="DD/MM/YYYY"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Mobile Number (मोबाइल)
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Mobile Number</label>
                       <input
                         type="text"
                         value={formFields.mobileNo || ''}
                         onChange={(e) => handleFieldChange('mobileNo', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500 font-mono"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Registration Date (पंजीकरण तिथि)
-                      </label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Registration Date</label>
                       <input
-                        type="date"
+                        type="text"
                         value={formFields.registrationDate || ''}
                         onChange={(e) => handleFieldChange('registrationDate', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       />
                     </div>
                   </div>
 
-                  {/* Residential Address */}
+                  {/* Address */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Residential Address (आवासीय पता)
-                    </label>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Residential Address</label>
                     <textarea
                       rows={2}
                       value={formFields.address || ''}
                       onChange={(e) => handleFieldChange('address', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                     />
                   </div>
 
@@ -606,92 +567,153 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
                   <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
                       <Building2 className="w-4 h-4" />
-                      <span>Current Employer Details (वर्तमान नियोक्ता विवरण)</span>
+                      <span>Current Employer Details</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="md:col-span-2">
-                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                          Employer Name
-                        </label>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Employer Name</label>
                         <input
                           type="text"
                           value={formFields.employerName || ''}
                           onChange={(e) => handleFieldChange('employerName', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                          Employer Code (17 digits)
-                        </label>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Employer Code</label>
                         <input
                           type="text"
                           value={formFields.employerCode || ''}
                           onChange={(e) => handleFieldChange('employerCode', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-blue-500"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                          Branch Office (शाखा कार्यालय)
-                        </label>
-                        <input
-                          type="text"
-                          value={formFields.branchOffice || ''}
-                          onChange={(e) => handleFieldChange('branchOffice', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                          Dispensary for IP (औषधालय)
-                        </label>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Dispensary</label>
                         <input
                           type="text"
                           value={formFields.dispensary || ''}
                           onChange={(e) => handleFieldChange('dispensary', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                          Appointment Date (नियुक्ति तिथि)
-                        </label>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Appointment Date</label>
                         <input
-                          type="date"
+                          type="text"
                           value={formFields.appointmentDate || ''}
                           onChange={(e) => handleFieldChange('appointmentDate', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Family Members & Nominee Preview */}
-                  {formFields.familyMembers && formFields.familyMembers.length > 0 && (
-                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                      <div className="flex items-center gap-2 text-xs font-bold text-amber-300 mb-2">
+                  {/* Fully Editable Family Members Section */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
                         <Users className="w-4 h-4" />
-                        <span>Extracted Family Members ({formFields.familyMembers.length})</span>
+                        <span>Family Members ({formFields.familyMembers?.length || 0}) - Editable</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                        {formFields.familyMembers.map((fam, idx) => (
-                          <div key={idx} className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px]">
-                            <p className="font-bold text-white">{fam.name}</p>
-                            <p className="text-slate-400">{fam.relation} &bull; {fam.dob || 'DOB: NA'}</p>
+                      <button
+                        type="button"
+                        onClick={handleAddFamilyMember}
+                        className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 rounded-lg text-amber-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Member</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {formFields.familyMembers && formFields.familyMembers.map((fam, idx) => (
+                        <div key={idx} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                          <div className="sm:col-span-5">
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Name</label>
+                            <input
+                              type="text"
+                              value={fam.name}
+                              onChange={(e) => handleFamilyMemberChange(idx, 'name', e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-semibold"
+                            />
                           </div>
-                        ))}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Relationship</label>
+                            <input
+                              type="text"
+                              value={fam.relation}
+                              onChange={(e) => handleFamilyMemberChange(idx, 'relation', e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] text-slate-400 mb-0.5">DOB</label>
+                            <input
+                              type="text"
+                              value={fam.dob || ''}
+                              onChange={(e) => handleFamilyMemberChange(idx, 'dob', e.target.value)}
+                              placeholder="DD/MM/YYYY"
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                            />
+                          </div>
+                          <div className="sm:col-span-1 flex items-end justify-center pt-4 sm:pt-0">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFamilyMember(idx)}
+                              className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Nominee Section */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Nominee Details</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Nominee Name</label>
+                        <input
+                          type="text"
+                          value={formFields.nominee?.name || ''}
+                          onChange={(e) => setFormFields(prev => ({ ...prev, nominee: { ...(prev.nominee || { relation: '', percentage: 100 }), name: e.target.value } }))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Relationship</label>
+                        <input
+                          type="text"
+                          value={formFields.nominee?.relation || ''}
+                          onChange={(e) => setFormFields(prev => ({ ...prev, nominee: { ...(prev.nominee || { name: '', percentage: 100 }), relation: e.target.value } }))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Share %</label>
+                        <input
+                          type="number"
+                          value={formFields.nominee?.percentage || 100}
+                          onChange={(e) => setFormFields(prev => ({ ...prev, nominee: { ...(prev.nominee || { name: '', relation: '' }), percentage: Number(e.target.value) } }))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ) : (
-                /* Raw text transcript preview */
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                   {parsedResult.rawText}
                 </div>
@@ -715,7 +737,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
             >
               <Database className="w-4 h-4 text-amber-300" />
-              <span>Save Transcript & Generate Smart ID Card (डेटा सेव करें)</span>
+              <span>Save & Generate Smart ID Card (डेटा सेव करें)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
